@@ -1,0 +1,6 @@
+data/
+ignore/
+
+lib/logs
+
+node_modules/

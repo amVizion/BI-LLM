@@ -1,0 +1,23 @@
+{
+  "name": "bi-llm-lib",
+  "version": "1.0.0",
+  "description": "Automatic analysis on semi-structured data",
+  "main": "index.ts",
+  "scripts": {
+    "test": "test.ts"
+  },
+  "author": "Santiago M.",
+  "license": "ISC",
+  "dependencies": {
+    "@tensorflow-models/universal-sentence-encoder": "^1.3.3",
+    "@tensorflow/tfjs-node": "^4.20.0",
+    "axios": "^1.7.4",
+    "ml-pca": "^4.1.1",
+    "ml-regression-multivariate-linear": "^2.0.4",
+    "ml-regression-polynomial": "^3.0.1",
+    "simple-statistics": "^7.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.2.0"
+  }
+}
