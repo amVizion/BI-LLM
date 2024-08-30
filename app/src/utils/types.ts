@@ -3,9 +3,9 @@ type tScore = { label:string, score:number }
 type tAttribute = { 
     label:string
     average:number
-    prevalence:number
+    prevalence:number | null
     correlation:number
-    causality:number 
+    causality:number | null
 }
 
 export interface iCorrelation { label:string, rho:number, mean:number, sd:number }
@@ -15,13 +15,14 @@ export interface iResearch { intro:string, body:string[], conclusion:string }
 export interface iCluster { 
     index:number
     name?:string
-    items:iItem[]
+    size:number
     centroid:number[]
     center:number[] 
     color:string
     avgOutput:number
     attributes: tAttribute[]
     subClusters?: iCluster[]
+    verticalCorrelations?: {[vertical:string]:iCorrelation[]}
 }
 
 export interface iItem { 
@@ -43,5 +44,11 @@ export interface iScatterData {
     fit: number
     output: number
     fill:string
+}
+
+export interface iVerticals {
+    verticals: string[]
+    correlations: {[vertical:string]:number}
+    labelCorrelations: {[vertical:string]:iCorrelation[]}
 }
 

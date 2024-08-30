@@ -1,11 +1,11 @@
 import { callOllama } from "./ollama" 
 
-export const LABEL_PROMPT = (purpose:string, items:string) => `
-Describe the following ${items} in 3 single-words.
+export const LABEL_PROMPT = (purpose:string, itemName:string) => `
+Describe the following ${itemName} in 3 single-words.
 For an analysis with the purpose of ${purpose}.
 Be brief, do not provide explanations. Use a JSON list as output.
 
-${items}:`
+${itemName}:`
 
 const SCORE_PROMPT = (itemName:string) => `
 Score the ${itemName} below based on the following attributes.
