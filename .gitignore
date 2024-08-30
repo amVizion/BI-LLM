@@ -2,5 +2,6 @@ data/
 ignore/
 
 lib/logs
+lib/config.json
 
 node_modules/

@@ -7,7 +7,8 @@ export const Predictions = ({items, correlations}:iPrediction) => {
     const labels = correlations.map(({ label }) => label)
     const firstRowLength = Math.ceil((labels.length - 3)/2)
 
-return <table className='table is-fullwidth'>
+return <div className="table-container">
+<table className='table is-fullwidth'>
     <thead>
         <tr className={'is-light'}>
             <th style={{color:'black', textAlign:'center'}} colSpan={11}> Predictions Table </th>
@@ -50,4 +51,4 @@ return <table className='table is-fullwidth'>
         </tr></>)}
     </tbody>
 </table>
-}
+</div>}

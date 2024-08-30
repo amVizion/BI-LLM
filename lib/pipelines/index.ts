@@ -10,17 +10,31 @@ import { existsSync } from 'fs'
 const LOGS_DIR = 'ignore/logs'
 const ERL_DIR = `${LOGS_DIR}/1. ERL`
 const SPC_DIR = `${LOGS_DIR}/2. SPC`
-const CDV_CONFIG = `${LOGS_DIR}/3.CDV`
+const CDV_CONFIG = `${LOGS_DIR}/3. CDV`
 
-const makeDirs = async() => {
+const makeDirs = async(config:iConfig) => {
     if(!existsSync(LOGS_DIR)) await mkdir(LOGS_DIR, { recursive: true })
     if(!existsSync(ERL_DIR)) await mkdir(ERL_DIR)
     if(!existsSync(SPC_DIR)) await mkdir(SPC_DIR)
     if(!existsSync(CDV_CONFIG)) await mkdir(CDV_CONFIG)
+
+    if(!config.verticals) return
+
+    const { verticals } = config
+    for (const vertical of verticals) {
+        const erlDirs = `${ERL_DIR}/${vertical}`
+        if(!existsSync(erlDirs)) await mkdir(erlDirs)
+        
+        const spcDirs = `${SPC_DIR}/${vertical}`
+        if(!existsSync(spcDirs)) await mkdir(spcDirs)
+    }    
 }
 
 interface iConfig {
     dataPath: string 
+
+    verticals?: string[] // Defaults to all. TODO: Validate label prompts.
+    labelPrompts?: {[vertical:string]:string}
 
     labels?: string[]
     nComponents?: number // Defaults to 5. TODO: Parametrize on app config.
@@ -49,12 +63,13 @@ const readConfig = async() => {
 const getTexts = async({ dataPath }: iConfig) => {
     // Read data path.
     const dataBuffer = await readFile(dataPath)
-    const data:iInputText[] = JSON.parse(dataBuffer.toString())
+    const rawData:iInputText[] = JSON.parse(dataBuffer.toString())
+    const data = rawData.filter(({ text, output }) => text && output)
 
     // Validate data object has text and output.
     const hasText = data.every(({ text }) => text)
     const hasOutput = data.every(({ output }) => output)
-    if(!hasText || !hasOutput) throw new Error('Invalid data object.')
+    if(!hasText || !hasOutput) throw new Error(`Invalid data object: ${hasText}, ${hasOutput}`)
 
     /* TODO:
     - Support other data formats (CSV).
@@ -66,20 +81,19 @@ const getTexts = async({ dataPath }: iConfig) => {
 
 
 const main = async() => {
-    await makeDirs()
 
     // TODO: Read texts from config.
     const config = await readConfig()
+    await makeDirs(config)
     const texts:iInputText[] = await getTexts(config)
 
-
     const ercConfig:iErcConfig = { ...config, path:ERL_DIR }
-    const { embeddedTexts, labels } = await erlPipeline(texts, ercConfig)
+    const { embeddedTexts, ...labels } = await erlPipeline(texts, ercConfig)
 
-    const spcConfig:iSpcConfig = { ...config, path:SPC_DIR, labels }
+    const spcConfig:iSpcConfig = { ...config, path:SPC_DIR, ...labels }
     const { clusters, clusteredTexts } = await spcPipeline(embeddedTexts, spcConfig)
 
-    const cdvConfig:iCdvConfig = { ...config, path:CDV_CONFIG, labels }
+    const cdvConfig:iCdvConfig = { ...config, path:CDV_CONFIG, ...labels }
     await cdvPipeline(clusteredTexts, clusters, cdvConfig)
 }
 

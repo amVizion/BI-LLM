@@ -47,14 +47,13 @@ import {
         { clusters && <Scatter 
           name='Clusters' 
           data={
-            clusters.map(({ center, items, name, avgOutput, index }) => ({ 
+            clusters.map(({ center, name, avgOutput, index, size }) => ({ 
               title: name || index,
               x: Math.round(center[0]*1000)/1000, 
               y: Math.round(center[1]*1000)/1000,             
-              z: items.length,
+              z: size,
               outputKey, 
               target: avgOutput,
-//              correlation: avgOutput
             }))
           }
         >

@@ -37,20 +37,24 @@ Outputs:
 
 */
 
-import { iLabeledText, iEmbeddedText, iScoredText, iClusteredText, iCluster, iResearchContext } from '../utils/types'
+import { iLabeledText, iEmbeddedText, iScoredText, iResearchContext } from '../utils/types'
+import { iRawCluster, iClusteredText, tVerticalLabels } from '../utils/types'
 import { getScorePrompt } from '../utils/prompts'
 import { getSampleTexts } from '../utils/utils'
 import { callOllama } from '../utils/ollama'
 
 import MLR from 'ml-regression-multivariate-linear'
 import { kMeansCluster } from 'simple-statistics'
-import { writeFile } from 'fs/promises'
+import { writeFile, readFile } from 'fs/promises'
+import { existsSync } from 'fs'
 import { PCA } from 'ml-pca'
 
 
 export interface iSpcConfig {
-    labels: string[]
     path: string
+    labels: string[]
+    verticals?: string[]
+    verticalLabels?: tVerticalLabels
 
     itemsToScore?: number
     scorePrompt?: string
@@ -61,14 +65,21 @@ export interface iSpcConfig {
     context: iResearchContext
 }
 
+const TEXTS_PATH = 'B.4. LabeledTexts.json'
+const CLUSTERS_PATH = 'B.6. Clusters.json'
+
 const getScores = async(texts:iEmbeddedText[], config:iSpcConfig) => {
-    if(config.predictor) return []
-    const { path } = config
+    const { predictor, scorePrompt:intro, context, itemsToScore=100 } = config
+    const { path, labels:attributes } = config
+    const { itemName } = context
 
+    if(predictor) return []
+    if(!attributes) throw new Error('Labels not provided.')
+
+    const rawScores:any[] = []
+
+    // Call Ollama to get scores.
     const scoreText = async(text:string) => {
-        const { scorePrompt:intro, labels:attributes, context } = config
-        const { itemName } = context
-
         const prompt = getScorePrompt({ intro, attributes, text, itemName })
 
         // Test output.
@@ -76,8 +87,10 @@ const getScores = async(texts:iEmbeddedText[], config:iSpcConfig) => {
             const scoreOutput = await callOllama(prompt)
             const jsonScore = JSON.parse(scoreOutput)
 
+            rawScores.push({text, score:jsonScore})
+
             // Validate jsonScore has all labels.
-            const hasAllLabels = attributes.every(a => jsonScore[a])
+            const hasAllLabels = attributes.every(a => jsonScore[a] !== undefined)
             if(!hasAllLabels) throw new Error('Missing labels in output.')
 
             // Validate jsonScore has no extra labels.
@@ -94,8 +107,8 @@ const getScores = async(texts:iEmbeddedText[], config:iSpcConfig) => {
         } catch(e) {}
     }
 
+    // Sample texts to score.
     const scoredTexts:iScoredText[] = []
-    const itemsToScore = config.itemsToScore || 100
     const sampleTexts = getSampleTexts(texts.map(({ text }) => text), itemsToScore)
     const textsToScore = sampleTexts.map(t => texts.find(({ text }) => text === t)!) // TODO: Refactor.
 
@@ -106,6 +119,10 @@ const getScores = async(texts:iEmbeddedText[], config:iSpcConfig) => {
         scoredTexts.push({ ...text, scores })
     }
 
+    // Store scores.
+    const jsonRawScores = JSON.stringify(rawScores, null, 4)
+    await writeFile(`${path}/B.0. RawScores.json`, jsonRawScores)
+
     const jsonScores = JSON.stringify(scoredTexts, null, 4)
     await writeFile(`${path}/B.1. Scores.json`, jsonScores)
 
@@ -113,8 +130,10 @@ const getScores = async(texts:iEmbeddedText[], config:iSpcConfig) => {
 }
 
 const predictLabels = async(texts:iEmbeddedText[], scoredTexts:iScoredText[], config:iSpcConfig) => {
-    const { path } = config
-
+    const { path, labels, predictor } = config
+    if(!labels) throw new Error('Labels not provided.')
+ 
+    // For each label, get a score based on annotated data.
     const trainPredictors = async(scoredTexts:iScoredText[], labels:string[]) => {
         const x = scoredTexts.map(({ embeddings }) => embeddings)
         const y = scoredTexts.map(({ scores }) => 
@@ -128,6 +147,7 @@ const predictLabels = async(texts:iEmbeddedText[], scoredTexts:iScoredText[], co
         return mlr
     }
 
+    // Make predictions based on text embeddings.
     const makePredictions = async(texts:iEmbeddedText[]) => {
         const x = texts.map(({ embeddings }) => embeddings)
         const y = texts.map(({ output }) => [output])
@@ -141,14 +161,15 @@ const predictLabels = async(texts:iEmbeddedText[], scoredTexts:iScoredText[], co
         return z
     }
 
-    const predictTexts = async(texts:iEmbeddedText[], mlr:MLR):Promise<iLabeledText[]> => {
+    interface iPredictTextsInput { texts:iEmbeddedText[], mlr:MLR, labels:string[] }
+    const predictTexts = async({ texts, mlr, labels }:iPredictTextsInput):Promise<iLabeledText[]> => {
         const x = texts.map(({ embeddings }) => embeddings)
         const z = mlr.predict(x)
 
         const labeledTexts = texts.map((t, i) => {
             const scores = z[i]
-            const labels = config.labels.map((l, j) => ({ label:l, score:scores[j] }))
-            return { ...t, labels }
+            const scoreLabeled = labels.map((l, j) => ({ label:l, score:scores[j] }))
+            return { ...t, labels: scoreLabeled }
         })
 
         const predictions = await makePredictions(labeledTexts)
@@ -158,8 +179,8 @@ const predictLabels = async(texts:iEmbeddedText[], scoredTexts:iScoredText[], co
         return predictedTexts
     }
 
-    const mlr = config.predictor || await trainPredictors(scoredTexts, config.labels)
-    const labeledTexts = predictTexts(texts, mlr)
+    const mlr = predictor || await trainPredictors(scoredTexts, labels)
+    const labeledTexts = await predictTexts({ texts, mlr, labels })
 
     const jsonLabeledTexts = JSON.stringify(labeledTexts, null, 4)
     await writeFile(`${path}/B.4. LabeledTexts.json`, jsonLabeledTexts)
@@ -186,24 +207,62 @@ const clusterTexts = async(labeledTexts:iLabeledText[], config:iSpcConfig) => {
     await writeFile(`${path}/B.5. ClusteredTexts.json`, jsonClusteredTexts)
 
     // Clusters with texts
-    const clusters:iCluster[] = centroids.map((c, i) => ({ index: i, 
+    const clusters:iRawCluster[] = centroids.map((c, i) => ({ index: i, 
         center: reducedCentroids[i],
-        items: clusteredTexts.filter(({ cluster }) => cluster === i),
         centroid: c
     }))
 
     const jsonCentroids = JSON.stringify(clusters, null, 4)
-    await writeFile(`${path}/B.5. Clusters.json`, jsonCentroids)
+    await writeFile(`${path}/B.6. Clusters.json`, jsonCentroids)
 
     return { clusters, clusteredTexts }
 }
 
+const iterateVerticals = async(texts:iEmbeddedText[], config:iSpcConfig) => {
+    const { verticals = [] } = config
+
+    if(!verticals.length) {
+        const scoredTexts:iScoredText[] = await getScores(texts, config)
+        const labeledTexts:iLabeledText[] = await predictLabels(texts, scoredTexts, config)
+        return labeledTexts
+    }
+
+    const verticalTexts:iLabeledText[][] = []
+
+    for (const vertical of verticals) {
+        const path = `${config.path}/${vertical}`
+        const labels = config?.verticalLabels![vertical]
+        const verticalConfig = {...config, path, labels}
+
+        const scoredTexts:iScoredText[] = await getScores(texts, verticalConfig)
+        const labeledTexts:iLabeledText[] = await predictLabels(texts, scoredTexts, verticalConfig)
+        verticalTexts.push(labeledTexts)
+    }
+
+    // Get all labels for each text.
+    const labeledTexts:iLabeledText[] = verticalTexts[0].map((t, i) => {
+        const allLabels = verticalTexts.map(d => d[i].labels)
+        const verticalLabels = verticals.reduce((d, v, j) => ({ ...d, [v]: allLabels[j] }), {})
+
+        return { ...t, labels:allLabels.flat(), verticalLabels }
+    })
+
+    await writeFile(`${config.path}/${TEXTS_PATH}`, JSON.stringify(labeledTexts, null, 4))
+    return labeledTexts
+}
 
 export const spcPipeline = async(texts:iEmbeddedText[], config:iSpcConfig) => {
-    console.log('Starting SPC pipeline.')
+    // Resume progress
+    if(existsSync(`${config.path}/${TEXTS_PATH}`)) {
+        const textsBuffer = await readFile(`${config.path}/${TEXTS_PATH}`)
+        const labeledTexts = JSON.parse(textsBuffer.toString())
 
-    const scoredTexts:iScoredText[] = await getScores(texts, config)
-    const labeledTexts:iLabeledText[] = await predictLabels(texts, scoredTexts, config)
+        const { clusters, clusteredTexts } = await clusterTexts(labeledTexts, config)
+        return { clusters, clusteredTexts }
+    }
+
+    console.log('Starting SPC Pipeline.')
+    const labeledTexts = await iterateVerticals(texts, config)
     const { clusters, clusteredTexts } = await clusterTexts(labeledTexts, config)
 
     return { clusters, clusteredTexts }

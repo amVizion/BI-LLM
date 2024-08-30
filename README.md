@@ -37,7 +37,7 @@ Navigate to directory: `cd lib/pipelines`
 
 Install dependencies: `npm install`
 
-Run the analysis: `ts-node index.ts`
+Run the analysis: `npx ts-node index`
 
 ### Visualize the results
 
@@ -68,7 +68,7 @@ Go-to-market strategy based on data-journalism sharing insights on important que
 
 If you are interested in contributing, please open a GitHub issue. If possible, including artifacts of the analysis you've ran, and what details on what would you like to improve, or add.
 
-If you are a startup, or open-source project, and would like to explore integrations: I would love to hear from you. Please also open an issue to explore the possibility. So far, I've explored possible integrations with (Hammming)[https://hamming.ai/] for meta-prompting, and RAG evaluation, and with (Murnitur)[https://murnitur.ai/#features] for observability. [GuardrailsAI](https://www.guardrailsai.com/) is another good option. 
+If you are a startup, or open-source project, and would like to explore integrations: I would love to hear from you. Please also open an issue to explore the possibility. So far, I've explored possible integrations with [Hammming](https://hamming.ai/) for meta-prompting, and RAG evaluation, and with [Murnitur](https://murnitur.ai/#features) for observability. [GuardrailsAI](https://www.guardrailsai.com/) is another good option. 
 
 Lastly, if you are an investor, I would also like to hear from you. Today, I'm part-time on this, and with your help the project can turn into a startup. The idea is to focus on the development of the technology for 1 or 2 years, and later focus on enterprise features that enable collaboration, and governance at scale. The intention is to keep the project open, and fully-functional for individual users, and even small teams. 
 
