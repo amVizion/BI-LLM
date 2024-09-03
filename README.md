@@ -2,7 +2,7 @@
 
 *Democratize data analysis*
 
-[![BI-LLM](docs/cover.png)](https://youtu.be/RoLU_REypyY)
+[![BI-LLM](docs/static/cover.png)](https://youtu.be/RoLU_REypyY)
 
 BI-LLM automates data analysis workflows using LLMs, and machine learning methods. 
 
@@ -12,9 +12,9 @@ BI-LLM labels texts, and groups them by similarity. Then, it uses the labels to 
 
 The image on the left shows the data processing pipeline. The image on the right the prompting sequence that leads to the report. 
 
-![docs/BI-LLM.png](docs/BI-LLM.png)
+![docs/static/BI-LLM.png](docs/static/BI-LLM.png)
 
-A sample of the report generated can be found in the `docs/demos` folder. You can see a demo of the proyect in [YouTube](https://youtu.be/RoLU_REypyY).
+A sample of the report generated can be found in the `docs/demo` folder. You can see a demo of the proyect in [YouTube](https://youtu.be/RoLU_REypyY).
 
 
 ## Getting Started

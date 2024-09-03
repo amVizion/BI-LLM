@@ -1,3 +1,5 @@
+import { iCluster, iClusterReport, iReportAnalysis } from "../../app/src/utils/types"
+import { iResearchContext } from "./types"
 import { callOllama } from "./ollama" 
 
 export const LABEL_PROMPT = (purpose:string, itemName:string) => `
@@ -25,46 +27,142 @@ ${itemName}:
 ${text}
 `
 
+export const getTitle = async(analysis:string) => await callOllama(`
+Write a title for the following analysis.
+Be succint. Only provide the title, no subtitle. 
+Use 7 words or less, do not provide an explanation or introduction.
 
-const INTRO_PROMPT = ``
-interface iIntroInput { purpose:string, labels:string[] }
-export const getIntro= async({ purpose, labels }:iIntroInput) => await callOllama(`
-Provide an introduction for a data analysis based on the purpose of ${purpose}
-The analysis considered the attributes: ${labels.join(', ')}.
-    ${INTRO_PROMPT}: ${purpose}`)
+Analysis:
+${analysis}
 
-const describeCluster = async(items:string, attributes:string[]) => await callOllama(`
-Write one paragraph describing a group of ${items}s that share similar attributes including: 
-${attributes.join(', ')}:
-`) // TODO: Helper function to substitute final comma (',') with conjunction (and).
+Title:
+`) 
 
-// Deals with causality
-const explainCluster = async(itemName:string, outcome:string, positive:string[], negative:string[]) => await callOllama(`
-Write one paragraph narrative that explains the causality between a ${itemName} and the ${outcome}:
-Attributes that correlate positively with the ${outcome} are: ${positive.join(', ')}
-While attributes that correlate negatively with the ${outcome} are: ${negative.join(', ')} 
+export const getIntro= async(analysis:string, purpose:string) => await callOllama(`
+Write an introduction for the following analysis with the purpose of ${purpose}.
+Be succint. Do not provide a title. Write a single paragraph.
+
+Analysis:
+${analysis}
+
+Introduction:
 `)
 
-const writeCluster = async(description:string, explanation:string) => await callOllama(`
-Consolidate the following description, and explanation into a cohesive analytical narrative
+type tVerticalLabels = { [vertical:string]:string[] } | string[] | any
+interface iVerticalDescription { 
+    itemName:string
+    verticals?: string[]
+    labels: tVerticalLabels
+}
+const describeCluster = async({ itemName, verticals, labels }: iVerticalDescription) => await callOllama(`
+Describe in one paragraph the nature of a ${itemName} collection that shares the following attributes:
+${verticals
+    ? verticals.map((vertical, i) => labels[vertical].length ? 
+        `- Attributes related to ${vertical}: ${labels[vertical].join(', ')}` : '').join('\n')
+    : `- Attributes: ${labels.join(', ')}`
+}`)
+
+
+interface iVerticalExplanation { 
+    purpose:string
+    verticals?: string[]
+    positive: tVerticalLabels
+    negative: tVerticalLabels
+}
+
+// Deals with causality
+const explainLabels = async({verticals, purpose, positive, negative}:iVerticalExplanation) => await callOllama(`
+Write one paragraph to ${purpose} based on the following attributes.
+Do not provide an introduction of the analysis. Dive deep straight to the insights.
+
+Attributes that correlate positively with the expected outcome:
+${verticals
+    ? verticals.map(vertical => `- ${vertical} attributes: ${positive[vertical].join(', ')}`).join('\n')
+    : `- Attributes: ${positive.join(', ')}`
+}
+
+Attributes that correlate negatively with the expected outcome:
+${verticals
+    ? verticals.map((vertical, i) => `- ${vertical} attributes: ${negative[vertical].join(', ')}`).join('\n')
+    : `- Attributes: ${negative.join(', ')}`
+}
+`)
+    
+
+const titleCluster = async(itemName:string, description:string) => await callOllama(`
+Choose a name, title, and summary for the following ${itemName} collection based on the description of its common attributes.
+The name should not be more than 3 words long, the title should not exceed 100 characters, and the summary should not exceed 250 characters.
+Use a JSON object as output with keys "name", "title", and "summary".
 
 Description:
 ${description}
-
-Explanation:
-${explanation}
 `)
 
-interface iGetClusterAnalysisInput { itemName:string, labels:string[], outcome:string, positive:string[], negative:string[] }
-export const getClusterAnalysis = async(input:iGetClusterAnalysisInput) => {
-    const { itemName, labels, outcome, positive, negative } = input
+interface iGetTitleClusterOutput { name:string, title:string, summary:string }
+const getTitleCluster = async(itemName:string, description:string):Promise<iGetTitleClusterOutput> => {
+    try{
+        const titleResponse = await titleCluster(itemName, description)
+        const { name, title, summary } = JSON.parse(titleResponse)
 
-    const description = await describeCluster(itemName, labels)
-    const explanation = await explainCluster(itemName, outcome, positive, negative)
-    const clusterAnalysis = await writeCluster(description, explanation)
-
-    return clusterAnalysis
+        if(!name && name.split(' ').length > 3 ) throw new Error('No name found')
+        if(!title && title.length > 100 ) throw new Error('No title found')
+        if(!summary && summary.length > 250 ) throw new Error('No summary found')
+        return { name, title, summary }
+    
+    } catch(e) { return await getTitleCluster(itemName, description) }
 }
+
+export type tLabelPrompt = { [vertical:string]:string[] } |  string[]
+interface iGetClusterAnalysisInput { 
+    index: number
+    verticals?:string[]
+    context: iResearchContext, 
+    labels: tLabelPrompt
+    positive?: tLabelPrompt
+    negative?: tLabelPrompt
+}
+
+export const getClusterAnalysis = async(input:iGetClusterAnalysisInput):Promise<iClusterReport> => {
+    const { context, labels, positive, negative, verticals, index } = input
+    const { itemName, purpose } = context
+
+    const description = await describeCluster({itemName, verticals, labels})
+    const analysis = await explainLabels({ verticals, purpose, positive, negative })
+    const title = await getTitleCluster(itemName, description)
+
+    return { index, description, analysis, ...title }
+}
+
+const explainClusters = async({ purpose, clusters }:{purpose:string, clusters:iCluster[]}) => await callOllama(`
+The following clusters have been ranked by performance to ${purpose}.
+Based on the cluster summaries, explain what contributed to the different outcomes. 
+
+The last clusters did not perform well, explain why.
+Do not provide individual explanations for each clusters. Instead summarize your insights in a concise analysis.
+
+Do not provide an introduction of the analysis. Dive deep straight to the insights.
+
+Clusters:
+${ clusters.sort(({ avgOutput:a }, { avgOutput:b }) => a > b ? -1 : 1)
+.map(({ name, summary }, i) => `- ${i+1}. ${name}: ${summary}`).join('\n') }
+`)
+
+interface iWriteAnalysis { 
+    purpose:string, 
+    verticals:string[], 
+    positive:tLabelPrompt, 
+    negative:tLabelPrompt, 
+    clusters:iCluster[] 
+}
+
+export const writeAnalysis = async(input:iWriteAnalysis):Promise<iReportAnalysis> => {
+    const { purpose, verticals, positive, negative, clusters } = input
+    const labels = await explainLabels({ verticals, purpose, positive, negative })
+    const clustersAnalysis = await explainClusters({ purpose, clusters })
+
+    return { labels, clusters:clustersAnalysis }
+}
+
 
 const summarizeReport = async(body:string) => await callOllama(`
 Summarize the following text into a succint conclusion.
@@ -90,14 +188,11 @@ Explanation:
 ${explanation}
 `)
 
+export const writeConclusion = async(report:string) => {
 
-interface iWriteConclusionInput { purpose:string, outcome:string, positive:string[], negative:string[] }
-export const writeConclusion = async(input:iWriteConclusionInput) => {
-    const { purpose, outcome, positive, negative } = input
+    const summary = await summarizeReport(report)
+//    const explanation = await explainReport(purpose, outcome, positive, negative)
+//    const conclusion = await getConclusion(summary, explanation)
 
-    const summary = await summarizeReport(purpose)
-    const explanation = await explainReport(purpose, outcome, positive, negative)
-    const conclusion = await getConclusion(summary, explanation)
-
-    return conclusion
+    return summary
 }

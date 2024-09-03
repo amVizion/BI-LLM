@@ -31,9 +31,9 @@ Correlate Describe Visualize (CDV) Pipeline:
 
 */
 
-import { iClusteredText, iResearch, iResearchContext, tVerticalLabels } from '../utils/types'
-import { getIntro, getClusterAnalysis, writeConclusion } from '../utils/prompts'
-import { iVerticals, iCorrelation, iCluster } from '../../app/src/utils/types'
+import { iVerticals, iCorrelation, iCluster, iReport, iClusterReport, iReportAnalysis } from '../../app/src/utils/types'
+import { getIntro, getClusterAnalysis, writeConclusion, tLabelPrompt, writeAnalysis, getTitle } from '../utils/prompts'
+import { iClusteredText, iResearchContext, tVerticalLabels } from '../utils/types'
 import { iRawCluster, iColoredCluster } from '../utils/types'
 
 import { PolynomialRegression } from 'ml-regression-polynomial'
@@ -150,7 +150,7 @@ const correlate = async(texts:iClusteredText[], clusters: iRawCluster[], config:
         const correlatedClusters:iCluster[] = clusters.map(cluster => {
             const items = texts.filter(({ cluster: c }) => c === cluster.index)
 
-            const attributes = labels.map(label => {
+            const getAttributes = (labels:string[], items:iClusteredText[]) => labels.map(label => {
                 const score = items.map(({ labels }) => labels.find(l => l.label === label)!.score)
                 const average = score.reduce((acc, s) => acc + s, 0) / score.length
                 const { mean, sd, rho:correlation } = correlations.find(l => label === l.label)!
@@ -162,8 +162,12 @@ const correlate = async(texts:iClusteredText[], clusters: iRawCluster[], config:
                 return attribute
             })
 
-            const { verticalCorrelations:v } = getVerticalCorrelations(items, config)
-            return { ...cluster, size:items.length, attributes, verticalCorrelations:v?.labelCorrelations }
+            const attributes = getAttributes(labels, items)
+            const verticalAttributes = config.verticals ? config.verticals.reduce((d, v) => ({
+                ...d, [v]: getAttributes(config.verticalLabels![v], items)
+            }), {}): undefined
+
+            return { ...cluster, size:items.length, attributes, verticalAttributes }
         })
 
         return correlatedClusters
@@ -188,46 +192,106 @@ const correlate = async(texts:iClusteredText[], clusters: iRawCluster[], config:
 }
 
 
-interface iDescribeInput { config:iCdvConfig, correlations:iCorrelation[], clusters:iCluster[] }
+interface iDescribeInput { 
+    config:iCdvConfig
+    correlations:iCorrelation[]
+    verticalCorrelations?: iVerticals
+    clusters:iCluster[] 
+}
 const describe = async(input:iDescribeInput) => {
-    const { config, correlations, clusters } = input
+    const { config, correlations, clusters, verticalCorrelations } = input
     const { context } = config
 
     const labels = correlations.map(({ label }) => label)
 
     // Get introduction
-    const { purpose } = context
-    const intro = await getIntro({ purpose, labels })
-    const body = []
+    const clustersReport:iClusterReport[] = []
 
     // Describe clusters
-    for (const { attributes } of clusters) {
-        const labels = attributes.sort(({ prevalence: a }, { prevalence: b }) => (a || 0) > (b || 0) ? -1 : 1).map(({ label }) => label)
-        const positive = attributes.sort(({ correlation:a }, { correlation:b }) => a > b ? -1 : 1).map(({ label }) => label)
-        const negative = attributes.sort(({ correlation:a }, { correlation:b }) => a > b ? 1 : -1).map(({ label }) => label)
+    for (const { attributes, verticalAttributes, index } of clusters) {
+        const { verticals, verticalLabels } = config
+        const labels:tLabelPrompt = verticals && verticalLabels
+            ? verticals.map(v => 
+                verticalAttributes![v].sort(({ prevalence: a }, { prevalence: b }) => (a || -1) > (b || -1) ? -1 : 1)
+                .filter(({ prevalence }, i) => i < 3 && (prevalence || -1) > 0).map(({ label }) => label)
+            ).reduce((d, v, i) => ({ ...d, [verticals[i]]:v }), {})
+            : attributes.sort(({ prevalence: a }, { prevalence: b }) => (a || -1) > (b || -1) ? -1 : 1)
+            .filter(({ prevalence }, i) => i < 3 && (prevalence || -1) > 0).map(({ label }) => label)
 
-        const clusterAnalysis = await getClusterAnalysis({ ...context, labels, positive, negative })
-        body.push(clusterAnalysis)
+        const positive:tLabelPrompt = verticals && verticalLabels
+            ? verticals.map(v =>
+                verticalAttributes![v].sort(({ correlation: a }, { correlation: b }) => a > b ? -1 : 1)
+                .filter(({ correlation }, i) => correlation > 0 && i < 3).map(({ label }) => label)
+            ).reduce((d, v, i) => ({ ...d, [verticals[i]]:v }), {})
+            : attributes.sort(({ correlation:a }, { correlation:b }) => a > b ? -1 : 1)
+            .filter(({ correlation }, i) => correlation > 0 && i < 3).map(({ label }) => label)
+
+        const negative:tLabelPrompt = verticals && verticalLabels
+            ? verticals.map(v =>
+                verticalAttributes![v].sort(({ correlation: a }, { correlation: b }) => a > b ? 1 : -1)
+                .filter(({ correlation }, i) => correlation < 0 && i < 2).map(({ label }) => label)
+            ).reduce((d, v, i) => ({ ...d, [verticals[i]]:v }), {})    
+            : attributes.sort(({ correlation:a }, { correlation:b }) => a > b ? 1 : -1)
+            .filter(({ correlation }, i) => correlation < 0 && i < 2).map(({ label }) => label)
+
+        const clusterAnalysis = await getClusterAnalysis({ index, verticals, context, labels, positive, negative })
+        clustersReport.push(clusterAnalysis)
+
     } // TODO: Test prompts, and computation of correlation objects.
 
-    const positive = correlations.sort(({ rho: a }, { rho: b }) => a > b ? -1 : 1).map(({ label }) => label)
-    const negative = correlations.sort(({ rho: a }, { rho: b }) => a > b ? 1 : -1).map(({ label }) => label)
 
-    // Write conclusion
-    const conclusion = await writeConclusion({...context, positive, negative})
+    const positive = config.verticals && verticalCorrelations?.labelCorrelations
+        ? config.verticals.map(v => 
+            verticalCorrelations.labelCorrelations[v]
+            .filter(({ rho }) => rho > 0).sort(({ rho: a }, { rho: b }) => a > b ? -1 : 1)
+            .map(({ label }) => label)).reduce((d, v, i) => ({ ...d, [config.verticals![i]]:v }), {})
+        : correlations.filter(({ rho }) => rho > 0)
+            .sort(({ rho: a }, { rho: b }) => a > b ? -1 : 1).map(({ label }) => label)
 
-    const research:iResearch = { intro, body, conclusion }
-    await writeFile(`${config.path}/C.4. Research.json`, JSON.stringify(research, null, 4))
-    return research
+    const negative = config.verticals && verticalCorrelations?.labelCorrelations
+        ? config.verticals.map(v =>
+            verticalCorrelations.labelCorrelations[v]
+            .filter(({ rho }) => rho < 0).sort(({ rho: a }, { rho: b }) => a > b ? 1 : -1)
+            .map(({ label }) => label)).reduce((d, v, i) => ({ ...d, [config.verticals![i]]:v }), {})
+        : correlations.filter(({ rho }) => rho < 0)
+            .sort(({ rho: a }, { rho: b }) => a > b ? 1 : -1).map(({ label }) => label)
+
+    const { purpose } = context
+    // Add name to clusters
+    const namedClusters = clusters.map((cluster, i) => ({ 
+        ...cluster, 
+        name: clustersReport[i].name,
+        summary: clustersReport[i].summary,
+        description: `${clustersReport[i].description}\n\n${clustersReport[i].analysis}`
+    }))
+
+
+    const analysis:iReportAnalysis = await writeAnalysis({
+        purpose, verticals:config.verticals || [], positive, negative, clusters:namedClusters
+    })
+
+    const body = `
+${clustersReport.map(({ description }) => `${description}\n\n`).join('\n\n')}
+${analysis.labels}\n\n${analysis.clusters}
+`
+
+    const conclusion = await writeConclusion(body)
+    const intro = await getIntro(body, purpose)
+    const title = await getTitle(`${intro}\n\n${body}\n\n${conclusion}`)
+
+    const report:iReport = { title, intro, clusters:clustersReport, analysis, conclusion }
+    await writeFile(`${config.path}/C.4. Report.json`, JSON.stringify(report, null, 4))
+
+
+    return { report, clusters:namedClusters }
 }
 
-interface iReport { intro:string, body:string[], conclusion:string }
 interface iVisualizeInput { 
-    correlations:iCorrelation[]
     clusters:iCluster[]
     texts:iClusteredText[] 
-    report:iReport
+    correlations:iCorrelation[]
     verticalCorrelations?: iVerticals
+    report:iReport
 }
 
 const visualize = async(input:iVisualizeInput) => {
@@ -243,9 +307,9 @@ const visualize = async(input:iVisualizeInput) => {
     return
 }
 
-export const cdvPipeline = async(texts:iClusteredText[], clusters:iRawCluster[], config:iCdvConfig) => {
+export const cdvPipeline = async(texts:iClusteredText[], rawClusters:iRawCluster[], config:iCdvConfig) => {
     console.log('Starting CDV Pipeline.')
-    const correlated = await correlate(texts, clusters, config)
-    const report = await describe({ ...correlated, config })
-    await visualize({...correlated, texts, report })
+    const correlated = await correlate(texts, rawClusters, config)
+    const { report, clusters } = await describe({ ...correlated, config })
+    await visualize({...correlated, texts, report, clusters })
 }
