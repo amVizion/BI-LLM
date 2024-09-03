@@ -1,11 +1,11 @@
-import { ClusterCorrelations, SingleCorrelations, VerticalCorrelations } from './components/Correlations'
+import { ClusterAttributes, ClusterCorrelations, SingleCorrelations, VerticalCorrelations } from './components/Correlations'
 import { NavBar, Footer, REPORT_VIEW } from './components/Layout'
 import { Predictions } from './components/Predictions'
 import { Report } from './components/Report'
 import { Chart } from './components/Chart'
 
-import CORRELATIONS from './data/correlations.json'
 import { verticals, labelCorrelations } from './data/verticals.json'
+import CORRELATIONS from './data/correlations.json'
 import CLUSTERS from './data/clusters.json'
 import REPORT from './data/report.json'
 import ITEMS from './data/data.json'
@@ -42,9 +42,6 @@ const App = () => {
     setItems(clusterItems)
   } // TODO: Display items on chart.
 
-
-
-
   return <>
     <NavBar setView={setView}/>
     <div className='section' style={SECTION_STYLE}>
@@ -53,12 +50,27 @@ const App = () => {
         {
           view !== REPORT_VIEW && <>
             <Chart clusters={CLUSTERS} outputKey='Views' onClick={selectCluster}/>
+
+            {
+              cluster && 
+              <div className="field content">
+                {   <h2> { cluster.name || 'Cluster Title' } </h2> }
+                <textarea 
+                  disabled
+                  rows={12}
+                  value={cluster.description}
+                  className="textarea" 
+                  style={{color:'white'}}
+                />
+              </div>
+            }
+
             {
               cluster && verticals && 
-              <VerticalCorrelations 
-                title={`${cluster.name || `Cluster #${cluster.index}`} Correlations`}
+              <ClusterAttributes 
                 verticals={verticals} 
-                verticalCorrelations={cluster.verticalCorrelations!} 
+                verticalCorrelations={cluster.verticalAttributes!} 
+                title={`${cluster.name || `Cluster #${cluster.index}`} Correlations`}
               />
             }
 
@@ -73,7 +85,7 @@ const App = () => {
               !verticals && <SingleCorrelations clusters={CLUSTERS} correlations={CORRELATIONS} /> 
             }
 
-            <Predictions items={items || []} correlations={CORRELATIONS}/>
+            <Predictions items={items || []}/>
           </>
         }
 

@@ -1,54 +1,48 @@
-import { iCorrelation, iItem } from "../utils/types"
-import { TD } from "./Correlations"
+import { numberFormater } from "../utils/utils"
+import { iItem } from "../utils/types"
 
 
-interface iPrediction {items:iItem[], correlations: iCorrelation[]}
-export const Predictions = ({items, correlations}:iPrediction) => {
-    const labels = correlations.map(({ label }) => label)
-    const firstRowLength = Math.ceil((labels.length - 3)/2)
+interface iPrediction {items:iItem[]}
+export const Predictions = ({items}:iPrediction) => {
 
 return <div className="table-container">
 <table className='table is-fullwidth'>
     <thead>
         <tr className={'is-light'}>
-            <th style={{color:'black', textAlign:'center'}} colSpan={11}> Predictions Table </th>
+            <th style={{color:'black', textAlign:'center'}} colSpan={9}> 
+                Predictions Table 
+            </th>
         </tr>
+
         <tr className={'is-light'}>
-            <th style={{color:'black'}} rowSpan={2}> Text </th>
+            <th style={{color:'black'}}> Text </th>
             <th style={{color:'black'}}> Outcome </th>
             <th style={{color:'black'}}> Prediction </th>
+            {/* TODO: Include difference (Maybe as standard deviation). */}
             <th style={{color:'black'}}> Cluster </th>
 
-            { [...Array(firstRowLength)].map((_, i) => 
-                <th style={{color:'black'}}> { labels[i] } </th>
-            )}
-        </tr>
-
-        <tr className={'is-light'}>
-
-            { [...Array(labels.length - firstRowLength)].map((_, i) => 
-                <th style={{color:'black'}}> { labels[i+firstRowLength] } </th>
+            { [...Array(5)].map((_, i) => 
+                <th style={{color:'black'}}> No. { i } </th>
             )}
         </tr>
     </thead>
 
     <tbody>
-        {items.sort(({prediction:a}, {prediction:b})=> a > b ? -1 : 1)
-        .map((f, i) => <><tr key={i}>
-            <td rowSpan={2}> {f.text} </td>
-            <td> {f.output} </td>
-            <TD value={f.prediction}/>
-            <td> {f.cluster} </td>
+        {items.sort(({output:a}, {output:b})=> a > b ? -1 : 1)
+        .map((f, i) => {
 
-            { [...Array(firstRowLength)].map((_, i) => 
-                <TD value={ f.labels.find(({ label:l }) => l === labels[i])!.score } />
-            )}
-        </tr><tr>
-        { [...Array(labels.length - firstRowLength)].map((_, i) => 
-                <TD value={ f.labels.find(({ label:l }) => l === labels[i+firstRowLength])!.score } />
-            )}
+            const sortedLabels = f.labels.sort(({score:a}, {score:b}) => a > b ? -1 : 1)
+            return <tr key={i}>
+                <td style={{maxWidth:360}}> {f.text} </td>
+                <td> {numberFormater(f.output)} </td>
+                <td> {numberFormater(f.prediction)} </td>
+                <td> {f.cluster} </td>
 
-        </tr></>)}
+                { [...Array(5)].map((_, i) => 
+                    <td> { sortedLabels[i].label } ({ Math.round(sortedLabels[i].score) }) </td>
+                )}
+            </tr>
+        })}
     </tbody>
 </table>
 </div>}

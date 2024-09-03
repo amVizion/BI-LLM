@@ -18,4 +18,3 @@ export interface iRawCluster { index:number, centroid:number[], center:number[] 
 export interface iColoredCluster extends iRawCluster { color:string, avgOutput:number }
 
 export interface iResearchContext { purpose:string, outcome:string, itemName:string }
-export interface iResearch { intro:string, body:string[], conclusion:string }
