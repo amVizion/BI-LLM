@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+		"strict": true,
+		"target": "es6",
+		"types": ["node"],
+		"module": "commonJS",
+		"moduleResolution": "node",
+		"lib": ["ES2015", "es2019", "DOM"],
+		"forceConsistentCasingInFileNames": true,
+		"allowSyntheticDefaultImports": true,
+		"downlevelIteration": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true
+    }
+}
+  

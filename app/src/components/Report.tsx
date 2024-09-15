@@ -6,7 +6,7 @@ export const Report = ({ title, intro, clusters, analysis, conclusion }:iReport)
     className="container content"
     style={{marginTop:'1.5rem'}}
 >
-    <h1 className="title"> { title } </h1>
+    <h1 className="title"> { title.split('\n')[0] } </h1>
 
     { intro.split(`\n`).map((p, i) => <p key={i}> {p} </p> )} 
 

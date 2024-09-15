@@ -2,7 +2,7 @@ import { iCluster, iClusterReport, iReportAnalysis } from "../../app/src/utils/t
 import { iResearchContext } from "./types"
 import { callOllama } from "./ollama" 
 
-export const LABEL_PROMPT = (purpose:string, itemName:string) => `
+export const LABEL_PROMPT = ({itemName, purpose}: iResearchContext) => `
 Describe the following ${itemName} in 3 single-words.
 For an analysis with the purpose of ${purpose}.
 Be brief, do not provide explanations. Use a JSON list as output.
@@ -29,8 +29,8 @@ ${text}
 
 export const getTitle = async(analysis:string) => await callOllama(`
 Write a title for the following analysis.
-Be succint. Only provide the title, no subtitle. 
-Use 7 words or less, do not provide an explanation or introduction.
+Be succint. Only provide the title, no subtitle, introduction or explanation. 
+Use 7 words or less.
 
 Analysis:
 ${analysis}
