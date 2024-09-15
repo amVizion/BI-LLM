@@ -1,4 +1,5 @@
-import { ClusterAttributes, ClusterCorrelations, SingleCorrelations, VerticalCorrelations } from './components/Correlations'
+import { SingleCorrelations, VerticalCorrelations } from './components/Correlations'
+import { ClusterAttributes, ClusterCorrelations } from './components/Correlations'
 import { NavBar, Footer, REPORT_VIEW } from './components/Layout'
 import { Predictions } from './components/Predictions'
 import { Report } from './components/Report'

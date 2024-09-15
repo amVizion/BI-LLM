@@ -1,7 +1,11 @@
-data/
+app/src/data/
+data/logs/
 ignore/
 
 lib/logs
 lib/config.json
+
+nlp/config.json
+nlp/data/
 
 node_modules/

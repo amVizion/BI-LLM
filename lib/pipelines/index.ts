@@ -1,6 +1,6 @@
-import { erlPipeline, iErcConfig } from './1. ERL'
-import { spcPipeline, iSpcConfig } from './2. SPC'
-import { cdvPipeline, iCdvConfig } from './3. CDV'
+import { erlPipeline, iErcConfig } from './1.ERL'
+import { spcPipeline, iSpcConfig } from './2.SPC'
+import { cdvPipeline, iCdvConfig } from './3.CDV'
 
 import { iInputText, iResearchContext } from '../utils/types'
 import MLR from 'ml-regression-multivariate-linear'
@@ -8,9 +8,9 @@ import { mkdir, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 
 const LOGS_DIR = 'ignore/logs'
-const ERL_DIR = `${LOGS_DIR}/1. ERL`
-const SPC_DIR = `${LOGS_DIR}/2. SPC`
-const CDV_CONFIG = `${LOGS_DIR}/3. CDV`
+const ERL_DIR = `${LOGS_DIR}/1.ERL`
+const SPC_DIR = `${LOGS_DIR}/2.SPC`
+const CDV_CONFIG = `${LOGS_DIR}/3.CDV`
 
 const makeDirs = async(config:iConfig) => {
     if(!existsSync(LOGS_DIR)) await mkdir(LOGS_DIR, { recursive: true })

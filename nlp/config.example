@@ -1,0 +1,7 @@
+{ // Copy, and update this file as "nlp/config.json"
+    "appName": "", // Name of the application. Used to train the embeddings model.
+    "dataPath": "", // Path to the data file.
+    "verticalName": "", // ID. Name of the vertical associated to the labels. Can be versioned.
+    "labelPrompt": "" // Prompt to label by data (related to vertical).
+    "itemName": "", // Used during scoring.
+}
