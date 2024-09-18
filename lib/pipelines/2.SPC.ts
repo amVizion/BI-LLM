@@ -50,8 +50,8 @@ import { PCA } from 'ml-pca'
 
 
 export interface iSpcConfig {
-    path: string
-    labels: string[]
+    path?: string
+    labels?: string[]
     verticals?: string[]
     verticalLabels?: tVerticalLabels
 
@@ -65,11 +65,11 @@ export interface iSpcConfig {
 }
 
 const TEXTS_PATH = 'B.4. LabeledTexts.json'
-const CLUSTERS_PATH = 'B.6. Clusters.json'
 
 export const getScores = async(texts:iEmbeddedText[], config:iSpcConfig) => {
     const { predictor, scorePrompt:intro, context, itemsToScore=100 } = config
     const { path, labels:attributes } = config
+    if (!path) throw new Error('Path not provided.')
 
     if(!context) throw new Error('Context not provided.')
     const { itemName } = context
@@ -130,6 +130,19 @@ export const getScores = async(texts:iEmbeddedText[], config:iSpcConfig) => {
     return scoredTexts
 }
 
+// Make predictions based on text embeddings.
+export const makePredictions = async(texts:iEmbeddedText[]) => {
+    const x = texts.map(({ embeddings }) => embeddings)
+    const y = texts.map(({ output }) => [output])
+
+    const mlr = new MLR(x, y)
+    const mlrJson = JSON.stringify(mlr.toJSON(), null, 4)
+
+    const z = mlr.predict(x)
+    return z
+}
+
+
 export const predictLabels = async(texts:iEmbeddedText[], scoredTexts:iScoredText[], config:iSpcConfig) => {
     const { path, labels, predictor } = config
     if(!labels) throw new Error('Labels not provided.')
@@ -150,23 +163,10 @@ export const predictLabels = async(texts:iEmbeddedText[], scoredTexts:iScoredTex
         const mlr = new MLR(x, y)
         const mlrJson = JSON.stringify(mlr.toJSON(), null, 4)
 
-        await writeFile(`${path}/B.2. Predictors.json`, mlrJson)
+        if(path) await writeFile(`${path}/B.2. Predictors.json`, mlrJson)
         return mlr
     }
 
-    // Make predictions based on text embeddings.
-    const makePredictions = async(texts:iEmbeddedText[]) => {
-        const x = texts.map(({ embeddings }) => embeddings)
-        const y = texts.map(({ output }) => [output])
-
-        const mlr = new MLR(x, y)
-        const mlrJson = JSON.stringify(mlr.toJSON(), null, 4)
-
-        await writeFile(`${path}/B.3. Embeddings Predictor.json`, mlrJson)
-
-        const z = mlr.predict(x)
-        return z
-    }
 
     interface iPredictTextsInput { texts:iEmbeddedText[], mlr:MLR, labels:string[] }
     const predictTexts = async({ texts, mlr, labels }:iPredictTextsInput):Promise<iLabeledText[]> => {
@@ -179,23 +179,20 @@ export const predictLabels = async(texts:iEmbeddedText[], scoredTexts:iScoredTex
             return { ...t, labels: scoreLabeled }
         })
 
-        const predictions = await makePredictions(labeledTexts)
-        const predictedTexts = labeledTexts.map((t, i) => ({ ...t, prediction:predictions[i][0] }))
-
         // TODO: Log & store model errors 
-        return predictedTexts
+        return labeledTexts
     }
 
     const mlr = predictor || await trainPredictors(scoredTexts, labels)
     const labeledTexts = await predictTexts({ texts, mlr, labels })
 
     const jsonLabeledTexts = JSON.stringify(labeledTexts, null, 4)
-    await writeFile(`${path}/B.4. LabeledTexts.json`, jsonLabeledTexts)
+    if(path) await writeFile(`${path}/B.4. LabeledTexts.json`, jsonLabeledTexts)
 
     return {labeledTexts, predictor:mlr}
 }
 
-const clusterTexts = async(labeledTexts:iLabeledText[], config:iSpcConfig) => {
+export const clusterTexts = async(labeledTexts:iLabeledText[], config:iSpcConfig) => {
     const { path, numClusters } = config
 
     const embeddings = labeledTexts.map(({ embeddings }) => embeddings)
@@ -206,12 +203,15 @@ const clusterTexts = async(labeledTexts:iLabeledText[], config:iSpcConfig) => {
     const reducedCentroids = pca.predict(centroids, { nComponents:2 }).to2DArray()
     const reducedEmbeddings = pca.predict(embeddings, { nComponents:2 }).to2DArray()
 
-    const clusteredTexts:iClusteredText[] = labeledTexts.map((t, i) => ({ ...t, 
+    const predictions = await makePredictions(labeledTexts)
+    const predictedTexts = labeledTexts.map((t, i) => ({ ...t, prediction:predictions[i][0] }))
+
+    const clusteredTexts:iClusteredText[] = predictedTexts.map((t, i) => ({ ...t, 
         cluster:labels[i], center:reducedEmbeddings[i] 
     }))
 
     const jsonClusteredTexts = JSON.stringify(clusteredTexts, null, 4)
-    await writeFile(`${path}/B.5. ClusteredTexts.json`, jsonClusteredTexts)
+    if(path) await writeFile(`${path}/B.5. ClusteredTexts.json`, jsonClusteredTexts)
 
     // Clusters with texts
     const clusters:iRawCluster[] = centroids.map((c, i) => ({ index: i, 
@@ -220,7 +220,7 @@ const clusterTexts = async(labeledTexts:iLabeledText[], config:iSpcConfig) => {
     }))
 
     const jsonCentroids = JSON.stringify(clusters, null, 4)
-    await writeFile(`${path}/B.6. Clusters.json`, jsonCentroids)
+    if(path) await writeFile(`${path}/B.6. Clusters.json`, jsonCentroids)
 
     return { clusters, clusteredTexts }
 }

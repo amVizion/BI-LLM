@@ -3,12 +3,15 @@ export interface iEmbeddedText extends iInputText { embeddings:number[] }
 export interface iScoredText extends iEmbeddedText { scores:tScore[] }
 export interface iLabeledText extends iEmbeddedText { 
     labels:tScore[]
-    prediction:number 
     verticalLabels?:{ [vertical:string]:tScore[] }
 }
 
 
-export interface iClusteredText extends iLabeledText { cluster:number, center:number[] }
+export interface iClusteredText extends iLabeledText { 
+    cluster:number
+    center:number[]
+    prediction:number 
+}
 
 
 export type tScore = { label:string, score:number }

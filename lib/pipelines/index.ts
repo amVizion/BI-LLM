@@ -2,10 +2,10 @@ import { erlPipeline, iErcConfig } from './1.ERL'
 import { spcPipeline, iSpcConfig } from './2.SPC'
 import { cdvPipeline, iCdvConfig } from './3.CDV'
 
-import { iInputText, iResearchContext } from '../utils/types'
+import { iInputText, iResearchContext, tVerticalLabels } from '../utils/types'
 import MLR from 'ml-regression-multivariate-linear'
 import { mkdir, readFile } from 'fs/promises'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 
 const LOGS_DIR = 'ignore/logs'
 const ERL_DIR = `${LOGS_DIR}/1.ERL`
@@ -30,11 +30,14 @@ const makeDirs = async(config:iConfig) => {
     }    
 }
 
-interface iConfig {
+export interface iConfig {
     dataPath: string 
 
-    verticals?: string[] // Defaults to all. TODO: Validate label prompts.
+    verticals: string[] // Defaults to all. TODO: Validate label prompts.
+    verticalLabels: tVerticalLabels
     labelPrompts?: {[vertical:string]:string}
+    pcaModelPath?: string
+    skipWrite?: boolean
 
     labels?: string[]
     nComponents?: number // Defaults to 5. TODO: Parametrize on app config.
@@ -49,14 +52,41 @@ interface iConfig {
     context:iResearchContext // TODO: Rename "items" prop to "itemsName".
 }
 
-const readConfig = async() => {
-    const configBuffer = await readFile(`../config.json`)
+export const ATTRIBUTE_STORE_PATH = '../data/attributeStore'
+export const readConfig = async() => {
+    const configBuffer = await readFile(`./config.json`)
     const config:iConfig = JSON.parse(configBuffer.toString())
 
     const { itemName, purpose, outcome } = config.context
     if(!itemName || !purpose || !outcome) throw new Error('Invalid context.')
+    if(!config.verticals) throw new Error('Verticals not found.')
+    if(!config.pcaModelPath) throw new Error('PCA model path not found.')
 
-    return config
+    const texts = await getTexts(config)
+
+    const getLabels = (vertical:string) => {
+        const labelsPath = `${ATTRIBUTE_STORE_PATH}/${vertical}/labels.json`
+        const labelsBuffer = readFileSync(labelsPath)
+        const labels:string[] = JSON.parse(labelsBuffer.toString())
+        return labels
+    }
+
+    const verticalLabels = config.verticals.reduce((acc, vertical) => {
+        acc[vertical] = getLabels(vertical)
+        return acc
+    }, {} as {[vertical:string]:string[]})
+
+    // Iterate by verticals, and flat labels.
+    const labels = config.verticals.reduce((acc, vertical) => {
+        acc.push(...verticalLabels[vertical])
+        return acc
+    }, [] as string[])
+
+    config.labels = labels
+    config.verticalLabels = verticalLabels
+    config.skipWrite = true
+    
+    return { config, texts }
 }
 
 
@@ -83,9 +113,7 @@ const getTexts = async({ dataPath }: iConfig) => {
 const main = async() => {
 
     // TODO: Read texts from config.
-    const config = await readConfig()
-    await makeDirs(config)
-    const texts:iInputText[] = await getTexts(config)
+    const {config, texts} = await readConfig()
 
     const ercConfig:iErcConfig = { ...config, path:ERL_DIR }
     const { embeddedTexts, ...labels } = await erlPipeline(texts, ercConfig)
@@ -97,4 +125,4 @@ const main = async() => {
     await cdvPipeline(clusteredTexts, clusters, cdvConfig)
 }
 
-main().catch(console.error)
+// main().catch(console.error)

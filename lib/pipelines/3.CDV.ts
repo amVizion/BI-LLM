@@ -42,14 +42,14 @@ import { writeFile } from 'fs/promises'
 
 
 export interface iCdvConfig {
-    path: string
+    path?: string
     labels?: string[]
     verticals?: string[]
     context:iResearchContext
     verticalLabels?: tVerticalLabels
 }
 
-const correlate = async(texts:iClusteredText[], clusters: iRawCluster[], config:iCdvConfig) => {
+export const correlate = async(texts:iClusteredText[], clusters: iRawCluster[], config:iCdvConfig) => {
     const { path } = config
 
     const computeRho = (x:number[], y:number[]) => {
@@ -103,11 +103,11 @@ const correlate = async(texts:iClusteredText[], clusters: iRawCluster[], config:
         if(!labels) throw new Error('Labels not provided.')
 
         const correlations:iCorrelation[] = labels.map(label => {
-            const x = !vertical ? texts.map(({ labels }) => labels.find(l => 
-                l.label === label)!.score
-            ) : texts.map(({ verticalLabels }) => verticalLabels![vertical].find(l =>
-                l.label === label)!.score
-            )
+            const x = !vertical 
+                ? texts.map(({ labels }) => labels.find(l => l.label === label)!.score) 
+                : texts.map(({ verticalLabels }) => verticalLabels![vertical].find(l =>
+                    l.label === label)!.score
+                )
 
             const y = texts.map(({ output }) => output)
             const rho = computeRho(x, y)
@@ -180,12 +180,12 @@ const correlate = async(texts:iClusteredText[], clusters: iRawCluster[], config:
     const correlationsJson = JSON.stringify(correlations, null, 4)
     const clustersJSON = JSON.stringify(correlatedClusters, null, 4)
 
-    await writeFile(`${path}/C.1. Correlations.json`, correlationsJson)
-    await writeFile(`${path}/C.2. CorrelatedClusters.json`, clustersJSON)
+    if(path) await writeFile(`${path}/C.1. Correlations.json`, correlationsJson)
+    if(path) await writeFile(`${path}/C.2. CorrelatedClusters.json`, clustersJSON)
 
     if(verticalCorrelations) {
         const verticalCorrelationsJson = JSON.stringify(verticalCorrelations, null, 4)
-        await writeFile(`${path}/C.3. VerticalCorrelations.json`, verticalCorrelationsJson)
+        if(path) await writeFile(`${path}/C.3. VerticalCorrelations.json`, verticalCorrelationsJson)
     }
 
     return { clusters:correlatedClusters, correlations, verticalCorrelations }
@@ -200,7 +200,7 @@ interface iDescribeInput {
 }
 const describe = async(input:iDescribeInput) => {
     const { config, correlations, clusters, verticalCorrelations } = input
-    const { context } = config
+    const { context, path } = config
 
     const labels = correlations.map(({ label }) => label)
 
@@ -280,7 +280,7 @@ ${analysis.labels}\n\n${analysis.clusters}
     const title = await getTitle(`${intro}\n\n${body}\n\n${conclusion}`)
 
     const report:iReport = { title, intro, clusters:clustersReport, analysis, conclusion }
-    await writeFile(`${config.path}/C.4. Report.json`, JSON.stringify(report, null, 4))
+    if(path) await writeFile(`${path}/C.4. Report.json`, JSON.stringify(report, null, 4))
 
 
     return { report, clusters:namedClusters }
@@ -295,7 +295,7 @@ interface iVisualizeInput {
 }
 
 const visualize = async(input:iVisualizeInput) => {
-    const APP_DIR = '../../app/src/data'
+    const APP_DIR = '../app/src/data'
     const { correlations, clusters, texts, report, verticalCorrelations={} } = input
 
     await writeFile(`${APP_DIR}/correlations.json`, JSON.stringify(correlations, null, 4))
