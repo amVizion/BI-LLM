@@ -1,9 +1,9 @@
 import { numberFormater } from "../utils/utils"
-import { iItem } from "../utils/types"
+import { iCluster, iItem } from "../utils/types"
+import CORRELATIONS from '../data/correlations.json'
 
-
-interface iPrediction {items:iItem[]}
-export const Predictions = ({items}:iPrediction) => {
+interface iPrediction {items:iItem[], clusters?:iCluster[]}
+export const Predictions = ({items, clusters}:iPrediction) => {
 
 return <div className="table-container">
 <table className='table is-fullwidth'>
@@ -15,11 +15,11 @@ return <div className="table-container">
         </tr>
 
         <tr className={'is-light'}>
-            <th style={{color:'black'}}> Text </th>
+            <th style={{color:'black', minWidth:340}}> Text </th>
             <th style={{color:'black'}}> Outcome </th>
             <th style={{color:'black'}}> Prediction </th>
             {/* TODO: Include difference (Maybe as standard deviation). */}
-            <th style={{color:'black'}}> Cluster </th>
+            { clusters && <th style={{color:'black'}}> Cluster </th> }
 
             { [...Array(5)].map((_, i) => 
                 <th style={{color:'black'}}> No. { i } </th>
@@ -31,16 +31,23 @@ return <div className="table-container">
         {items.sort(({output:a}, {output:b})=> a > b ? -1 : 1)
         .map((f, i) => {
 
-            const sortedLabels = f.labels.sort(({score:a}, {score:b}) => a > b ? -1 : 1)
+            const sortedLabels = f.labels.sort((a, b) => 
+                (a.score - CORRELATIONS.find(({label}) => a.label === label)!.mean) > 
+                (b.score - CORRELATIONS.find(({label}) => b.label === label)!.mean)
+                ? -1 : 1
+            )
             return <tr key={i}>
                 <td style={{maxWidth:360}}> {f.text} </td>
                 <td> {numberFormater(f.output)} </td>
                 <td> {numberFormater(f.prediction)} </td>
-                <td> {f.cluster} </td>
+                { clusters && <td> {clusters[f.cluster].name} </td> }
 
-                { [...Array(5)].map((_, i) => 
-                    <td> { sortedLabels[i].label } ({ Math.round(sortedLabels[i].score) }) </td>
-                )}
+                { [...Array(5)].map((_, i) => <td> 
+                    { sortedLabels[i].label } ( 
+                        {Math.round(sortedLabels[i].score)}/ 
+                        {Math.round(CORRELATIONS.find(({label}) => sortedLabels[i].label === label)!.mean)}
+                    )
+                </td>)}
             </tr>
         })}
     </tbody>

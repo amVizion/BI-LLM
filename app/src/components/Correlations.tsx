@@ -13,8 +13,12 @@ import { iCluster, iCorrelation, tAttribute } from "../utils/types"
 import { useEffect, useState } from "react"
 
 
-export const TD = ({value}:{value?:number | null}) => value ? <td>  { Math.round(value*100)/100 } </td> : <td />
+interface iTD { value?:number | null, dashed?:boolean }
+export const TD = ({value, dashed}:iTD) => value 
+    ? <td style={dashed ? {borderBottom: '1px dashed white'} : {}}>  { Math.round(value*100)/100 } </td> 
+    : <td />
 
+// Table when no verticals are present. Orders attribubtes by cluster. Can be deprecated or refactored.
 interface iSingleCorrelations { clusters:iCluster[], correlations:iCorrelation[] }
 export const SingleCorrelations = ({ clusters, correlations }:iSingleCorrelations) => <table className='table is-fullwidth'>
 <thead>
@@ -75,6 +79,7 @@ interface iClusterAttributes {
     verticalCorrelations: {[vertical:string]:tAttribute[]}, 
 }
 
+// Table that explains the attributes for a given, selected, cluster.
 export const ClusterAttributes = ({ verticals, verticalCorrelations, title }:iClusterAttributes) => {
     const [correlations, setCorrelations] = useState<{[vertical:string]:tAttribute[]}>(verticalCorrelations)
 
@@ -134,6 +139,7 @@ return <table className='table is-fullwidth'>
 </table>
 }
 
+// Shows differences across clusters by comparing main attributes. TODO: Rename.
 export const ClusterCorrelations = ({ clusters }:{clusters:iCluster[]}) => {
 	const [sortedClusters, setClusters] = useState<iCluster[]>(clusters)
 
@@ -179,23 +185,21 @@ return <div className="table-container">
 			[...Array(5)].map((_, i) => <tr>
 				{
 					sortedClusters.map(({ attributes }) => <>
-						<td> { attributes[i].label } </td>
-						<TD value={ attributes[i].prevalence  || 0} />
-						<TD value={ attributes[i].correlation } />
-						<TD value={ attributes[i].causality || 0 } />
+						<td style={i===4 ? {borderBottom: '1px dashed white'} : {}}> { attributes[i].label } </td>
+						<TD value={ attributes[i].prevalence  || 0} dashed={i===4} />
+						<TD value={ attributes[i].correlation } dashed={i===4} />
+						<TD value={ attributes[i].causality || 0 } dashed={i===4} />
 					</>
 				)}
 			</tr>)
-		}
-
-		{
+		} {
 			[...Array(5)].map((_, i) => <tr>
 				{
 					sortedClusters.map(({ attributes }) => <>
-						<td> { attributes[i].label } </td>
-						<TD value={ attributes[attributes.length - i -1].prevalence  || 0} />
-						<TD value={ attributes[attributes.length - i -1].correlation } />
-						<TD value={ attributes[attributes.length - i -1].causality || 0 } />
+						<td> { attributes[attributes.length -5 +i].label } </td>
+						<TD value={ attributes[attributes.length -5 +i].prevalence  || 0} />
+						<TD value={ attributes[attributes.length -5 +i].correlation } />
+						<TD value={ attributes[attributes.length -5 +i].causality || 0 } />
 					</>
 				)}
 			</tr>)
@@ -211,20 +215,21 @@ interface iVerticalCorrelations {
     verticalCorrelations: {[vertical:string]:iCorrelation[]}, 
 }
 
+// Shows main attributes by vertical. Focus is on the rho value. TODO: Enable sorting.
 export const VerticalCorrelations = ({ verticals, verticalCorrelations, title }:iVerticalCorrelations) => {
     const [correlations, setCorrelations] = useState<{[vertical:string]:iCorrelation[]}>(verticalCorrelations)
+    const [sortKey, setSortKey] = useState<'rho' | 'mean' | 'sd'>('mean')
 
     useEffect(() => {
         // Sort correlations by rho. Then assign to corrs.
         const sorted = Object.keys(verticalCorrelations).reduce((acc, key) => {
             acc[key] = verticalCorrelations[key]
-            .filter(({ rho }) => rho)
-            .sort((a, b) => b.rho - a.rho)
+            .sort((a, b) => b[sortKey] - a[sortKey])
             return acc
         }, {} as {[key:string]:iCorrelation[]})
 
         setCorrelations(sorted)
-    }, [verticalCorrelations])
+    }, [verticalCorrelations, sortKey])
 
 return <table className='table is-fullwidth'>
     <thead>
@@ -243,29 +248,44 @@ return <table className='table is-fullwidth'>
         <tr className={'is-light'}>
             { [...Array(verticals.length)].map(() => <>
                 <th style={{color:'black'}}> Attribute </th>
-                <th style={{color:'black'}}> Rho </th>
-                <th style={{color:'black'}}> Mean </th>
-                <th style={{color:'black'}}> SD </th>
+                <th style={{color:'black'}} onClick={() => setSortKey('mean')}> Mean </th>
+                <th style={{color:'black'}} onClick={() => setSortKey('sd')}> SD </th>
+                <th style={{color:'black'}} onClick={() => setSortKey('rho')}> Rho </th>
             </>)
             }
         </tr>
     </thead>
 
-    <tbody>
-        {
-            [...Array(Math.max(...Object.keys(correlations).map(k => Object.keys(correlations[k]).length)))]
-            .map((_, i) => <tr key={i}>
+
+	<tbody>
+		{
+			[...Array(5)].map((_, i) => <tr>
                 { verticals.map((v) => {
                     const { label, rho, mean, sd } = correlations[v][i] || {}
                     return <>
-                        <td> { label } </td>
-                        <TD value={ rho } />
-                        <TD value={ mean } />
-                        <TD value={ sd } />
+                        <td style={i===4 ? {borderBottom: '1px dashed white'} : {}}> { label } </td>
+                        <TD value={ mean } dashed={i===4}/>
+                        <TD value={ sd } dashed={i===4}/>
+                        <TD value={ rho } dashed={i===4}/>
                     </>
                 })}
-            </tr>)
-        }
-    </tbody>
+			</tr>)
+		}
+
+		{
+			[...Array(5)].map((_, i) => <tr>
+                { verticals.map((v) => {
+                    const { label, rho, mean, sd } = correlations[v][correlations[v].length -5 +i] || {}
+                    return <>
+                        <td> { label } </td>
+                        <TD value={ mean } />
+                        <TD value={ sd } />
+                        <TD value={ rho } />
+                    </>
+                })}
+			</tr>)
+		}
+
+	</tbody>
 </table>
 }
