@@ -18,8 +18,8 @@ As a final step to demonstrate the business value of the analysis, the research 
 
 Development Roadmap
 - [x] Update pipeline to support AttributeStore.
-- [ ] Analysis by vertical on BI report.
+- [x] Analysis by vertical on BI report.
 - [x] Enhance tables to show vertical on predictions.
 - [ ] New views by vertical to correlate attributes.
-- [ ] Expected performance on report, and tables.
+- [x] Expected performance on report, and tables.
 - [x] Validate report value with experiment on ChatGPT.

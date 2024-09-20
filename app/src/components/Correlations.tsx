@@ -13,6 +13,8 @@ import { iCluster, iCorrelation, tAttribute } from "../utils/types"
 import { useEffect, useState } from "react"
 
 
+const TABLE_CLICK_STYLE = {cursor:'pointer', color:'black'}
+
 interface iTD { value?:number | null, dashed?:boolean }
 export const TD = ({value, dashed}:iTD) => value 
     ? <td style={dashed ? {borderBottom: '1px dashed white'} : {}}>  { Math.round(value*100)/100 } </td> 
@@ -248,9 +250,9 @@ return <table className='table is-fullwidth'>
         <tr className={'is-light'}>
             { [...Array(verticals.length)].map(() => <>
                 <th style={{color:'black'}}> Attribute </th>
-                <th style={{color:'black'}} onClick={() => setSortKey('mean')}> Mean </th>
-                <th style={{color:'black'}} onClick={() => setSortKey('sd')}> SD </th>
-                <th style={{color:'black'}} onClick={() => setSortKey('rho')}> Rho </th>
+                <th style={TABLE_CLICK_STYLE} onClick={() => setSortKey('mean')}> Mean </th>
+                <th style={TABLE_CLICK_STYLE} onClick={() => setSortKey('sd')}> SD </th>
+                <th style={TABLE_CLICK_STYLE} onClick={() => setSortKey('rho')}> Rho </th>
             </>)
             }
         </tr>

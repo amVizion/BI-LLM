@@ -21,6 +21,5 @@ export const Items = () => <div className='container' style={{maxWidth:1600}}>
         verticals={verticals} 
         verticalCorrelations={labelCorrelations} 
     />
-
     <Predictions items={DATA.sort((a, b) => b.output - a.output)}/>
 </div>
