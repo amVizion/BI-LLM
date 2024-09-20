@@ -9,3 +9,6 @@ nlp/config.json
 nlp/data/
 
 node_modules/
+package-lock.json
+
+nlp/helper.ts

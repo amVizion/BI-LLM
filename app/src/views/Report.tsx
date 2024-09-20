@@ -1,6 +1,8 @@
 // TODO: Add markdown syntax. Bold, and lists.
+import { ReactNode } from "react"
 import { iReport } from "../utils/types"
 
+const P = ({ children }:{children:ReactNode}) => <p style={{color:'white'}}> { children } </p>
 
 export const Report = ({ title, intro, clusters, analysis, conclusion }:iReport) => <div 
     className="container content"
@@ -8,29 +10,29 @@ export const Report = ({ title, intro, clusters, analysis, conclusion }:iReport)
 >
     <h1 className="title"> { title.split('\n')[0] } </h1>
 
-    { intro.split(`\n`).map((p, i) => <p key={i}> {p} </p> )} 
+    { intro.split(`\n`).map((p, i) => <P key={i}> {p} </P> )} 
 
-    <h2 style={{marginTop:'1rem'}}> Cluster's Description </h2>
+    <h2 style={{marginTop:'1rem', color:'white'}}> Cluster's Description </h2>
 
     { 
         clusters.map(({ title, description }) => <>
             { description.split(`\n`).map((p, i) => 
                 i === 0 
-                ? <p> <b> {title}: </b> { p } </p>
-                : <p key={i}> {p} </p>
+                ? <P> <b> {title}: </b> { p } </P>
+                : <P key={i}> {p} </P>
             )}
         </>) 
     }
 
     <h2 style={{marginTop:'1rem'}}> Analysis </h2>
 
-    { analysis.labels.split('\n').map((p, i) => <p key={i}> { p } </p> ) }
-    { analysis.clusters.split('\n\n').map((p, i) => <p key={i}> { p } </p> ) }
+    { analysis.labels.split('\n').map((p, i) => <P key={i}> { p } </P> ) }
+    { analysis.clusters.split('\n\n').map((p, i) => <P key={i}> { p } </P> ) }
     { 
         analysis.verticals && 
-        analysis.verticals.split('\n').map((p, i) => <p key={i}> { p } </p> ) 
+        analysis.verticals.split('\n').map((p, i) => <P key={i}> { p } </P> ) 
     }
 
     <h2 style={{marginTop:'1rem'}}> Conclusion </h2>
-    <p> { conclusion } </p> 
+    <P> { conclusion } </P> 
 </div>

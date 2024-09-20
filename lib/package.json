@@ -4,6 +4,7 @@
   "description": "Automatic analysis on semi-structured data",
   "main": "index.ts",
   "scripts": {
+    "bi-llm": "npx ts-node index.ts",
     "test": "test.ts"
   },
   "author": "Santiago M.",
