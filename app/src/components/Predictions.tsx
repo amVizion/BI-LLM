@@ -3,6 +3,7 @@ import { iCluster, iItem } from "../utils/types"
 import { numberFormater } from "../utils/utils"
 import { CSSProperties, useEffect, useState } from "react"
 import axios from "axios"
+import { Dropdown } from './PromptBox'
 
 
 const TABLE_HEADER_STYLE:CSSProperties = {color:'black', textAlign:'center', verticalAlign:'middle'}
@@ -48,15 +49,18 @@ export const Predictions = ({items, clusters}:iPrediction) => {
 <table className='table is-fullwidth'>
     <thead>
         <tr className={'is-light'}>
-            <th style={TABLE_HEADER_STYLE} colSpan={7}> 
+            <th style={TABLE_HEADER_STYLE} colSpan={6}> 
                 Predictions Table 
             </th>
             <th>
-            <button 
-            onClick={makePredictions}
-            className={`button is-info`} 
-        > Make Predictions </button>
+                <Dropdown text={'Actions'} color='is-info'/> 
+            </th>
 
+            <th>
+                <button 
+                    onClick={makePredictions}
+                    className={`button is-link`} 
+                > Make Predictions </button>
             </th>
         </tr>
 
@@ -78,9 +82,9 @@ export const Predictions = ({items, clusters}:iPrediction) => {
         .map((f, i) => {
 
             const sortedLabels = f.labels.sort((a, b) => 
-                (a.score - CORRELATIONS.find(({label}) => a.label === label)!.mean) > 
-                (b.score - CORRELATIONS.find(({label}) => b.label === label)!.mean)
-                ? -1 : 1
+                Math.abs(a.score * CORRELATIONS.find(({label}) => a.label === label)!.rho) > 
+                Math.abs(b.score * CORRELATIONS.find(({label}) => b.label === label)!.rho)
+                    ? -1 : 1
             )
             return <tr key={i}>
                 <td style={{maxWidth:360}}> {f.text} </td>
@@ -88,11 +92,10 @@ export const Predictions = ({items, clusters}:iPrediction) => {
                 <td style={{textAlign:'center'}}> {numberFormater(f.prediction)} </td>
                 { clusters && <td> {clusters[f.cluster].name} </td> }
 
-                { [...Array(5)].map((_, i) => <td> 
-                    { sortedLabels[i].label } ( 
-                        {Math.round(sortedLabels[i].score)}/ 
-                        {Math.round(CORRELATIONS.find(({label}) => sortedLabels[i].label === label)!.mean)}
-                    )
+                { [...Array(5)].map((_, i) => 
+                    <td 
+                        style={{color:CORRELATIONS.find(({label}) => sortedLabels[i].label === label)!.rho > 0 ? 'palegreen' : 'lightcoral'}}> 
+                    { sortedLabels[i].label } ({Math.round(sortedLabels[i].score)})
                 </td>)}
             </tr>
         })}

@@ -27,7 +27,7 @@ export const NavBar = ({ setView }:iNavBar) => <nav
 		</div>
 
 		<div className="navbar-menu" style={NAVBAR_MENU_STYLE}>
-			<div className="navbar-end">
+			<div className="navbar-end" style={{display:'none'}}>
 				<a className="navbar-item" onClick={() => setView(ITEM_VIEW)}>
 						Items
 				</a>

@@ -3,16 +3,15 @@ import { ClusterAttributes, ClusterCorrelations } from '../components/Correlatio
 import { Predictions } from '../components/Predictions'
 import { Chart } from '../components/Chart'
 
-import { verticals, labelCorrelations } from '../data/verticals.json'
 import CORRELATIONS from '../data/correlations.json'
 import CLUSTERS from '../data/clusters.json'
 import ITEMS from '../data/data.json'
 
-import { iCluster, iItem } from '../utils/types'
+import { iCluster, iItem, iVerticals } from '../utils/types'
 import { useEffect, useState } from 'react'
 
 
-export const ClusterView = () => {
+export const ClusterView = ({ verticals, verticalCorrelations}: iVerticals) => {
   const [items, setItems] = useState<iItem[]>()
   const [cluster, setCluster] = useState<iCluster>()
 
@@ -66,7 +65,7 @@ export const ClusterView = () => {
       verticals && <>
         <VerticalCorrelations 
           verticals={verticals} 
-          verticalCorrelations={labelCorrelations} 
+          verticalCorrelations={verticalCorrelations!} 
         />
         <ClusterCorrelations clusters={CLUSTERS} />
       </>

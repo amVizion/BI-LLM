@@ -31,10 +31,12 @@ const makeDirs = async(config:iConfig) => {
 }
 
 export interface iConfig {
-    dataPath: string 
-
     verticals: string[] // Defaults to all. TODO: Validate label prompts.
-    verticalLabels: tVerticalLabels
+
+    data?: iInputText[]
+    dataPath?: string 
+
+    verticalLabels?: tVerticalLabels
     labelPrompts?: {[vertical:string]:string}
     pcaModelPath?: string
     skipWrite?: boolean
@@ -49,21 +51,10 @@ export interface iConfig {
     numClusters?: number
     predictor?: MLR // TODO: Implement.
 
-    context:iResearchContext // TODO: Rename "items" prop to "itemsName".
+    context?:iResearchContext // TODO: Rename "items" prop to "itemsName".
 }
 
-export const ATTRIBUTE_STORE_PATH = '../data/attributeStore'
-export const readConfig = async() => {
-    const configBuffer = await readFile(`./config.json`)
-    const config:iConfig = JSON.parse(configBuffer.toString())
-
-    const { itemName, purpose, outcome } = config.context
-    if(!itemName || !purpose || !outcome) throw new Error('Invalid context.')
-    if(!config.verticals) throw new Error('Verticals not found.')
-    if(!config.pcaModelPath) throw new Error('PCA model path not found.')
-
-    const texts = await getTexts(config)
-
+export const getVerticalLabels = (verticals:string[]) => {
     const getLabels = (vertical:string) => {
         const labelsPath = `${ATTRIBUTE_STORE_PATH}/${vertical}/labels.json`
         const labelsBuffer = readFileSync(labelsPath)
@@ -71,10 +62,25 @@ export const readConfig = async() => {
         return labels
     }
 
-    const verticalLabels = config.verticals.reduce((acc, vertical) => {
+    const verticalLabels = verticals.reduce((acc, vertical) => {
         acc[vertical] = getLabels(vertical)
         return acc
     }, {} as {[vertical:string]:string[]})
+
+    return verticalLabels
+}
+
+
+export const ATTRIBUTE_STORE_PATH = '../data/attributeStore'
+export const readConfig = async() => {
+    const configBuffer = await readFile(`./config.json`)
+    const config:iConfig = JSON.parse(configBuffer.toString())
+
+    if(!config.verticals) throw new Error('Verticals not found.')
+    if(!config.pcaModelPath) throw new Error('PCA model path not found.')
+
+    const texts = await getTexts(config)
+    const verticalLabels = getVerticalLabels(config.verticals)
 
     // Iterate by verticals, and flat labels.
     const labels = config.verticals.reduce((acc, vertical) => {
@@ -92,6 +98,8 @@ export const readConfig = async() => {
 
 const getTexts = async({ dataPath }: iConfig) => {
     // Read data path.
+
+    if(!dataPath) throw new Error('Data path not found.')
     const dataBuffer = await readFile(dataPath)
     const rawData:iInputText[] = JSON.parse(dataBuffer.toString())
     const data = rawData.filter(({ text, output }) => text && output)

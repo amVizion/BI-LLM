@@ -9,6 +9,8 @@ export type tAttribute = {
 }
 
 export interface iCorrelation { label:string, rho:number, mean:number, sd:number }
+
+
 export interface iClusterReport { 
     index: number
     name: string
@@ -70,8 +72,15 @@ export interface iScatterData {
     fill:string
 }
 
+
+// Full correlation includes prominence.
+// Prominence is the mean times the correlation. How relevant is the attribute to the performance.
+export interface iFullCorrelation extends iCorrelation { prominence:number } 
+export type tVerticalCorrelations = {[vertical:string]:iFullCorrelation[]}
+
 export interface iVerticals {
     verticals: string[]
-    correlations: {[vertical:string]:number}
+    correlations: {[vertical:string]:number | null}
     labelCorrelations: {[vertical:string]:iCorrelation[]}
+    verticalCorrelations?: tVerticalCorrelations
 }

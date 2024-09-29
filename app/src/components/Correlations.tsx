@@ -9,8 +9,10 @@ For each Cluster:
 
 */
 
-import { iCluster, iCorrelation, tAttribute } from "../utils/types"
-import { useEffect, useState } from "react"
+import { iCluster, iCorrelation, iFullCorrelation, tAttribute } from "../utils/types"
+import { CSSProperties, useEffect, useState } from "react"
+import { Dropdown } from "./PromptBox"
+import { iAction } from "../views/Items"
 
 
 const TABLE_CLICK_STYLE = {cursor:'pointer', color:'black'}
@@ -212,15 +214,18 @@ return <div className="table-container">
 
 
 interface iVerticalCorrelations { 
-    title?:string 
-    verticals:string[], 
-    verticalCorrelations: {[vertical:string]:iCorrelation[]}, 
+    title?:string
+    verticals:string[]
+    setAction(action:iAction):void
+    verticalCorrelations: {[vertical:string]:iFullCorrelation[]}
 }
 
+const TH_STYLE:CSSProperties = {color:'black', textAlign:'center'}
+
 // Shows main attributes by vertical. Focus is on the rho value. TODO: Enable sorting.
-export const VerticalCorrelations = ({ verticals, verticalCorrelations, title }:iVerticalCorrelations) => {
-    const [correlations, setCorrelations] = useState<{[vertical:string]:iCorrelation[]}>(verticalCorrelations)
-    const [sortKey, setSortKey] = useState<'rho' | 'mean' | 'sd'>('mean')
+export const VerticalCorrelations = ({ verticals, verticalCorrelations, setAction }:iVerticalCorrelations) => {
+    const [correlations, setCorrelations] = useState<{[vertical:string]:iFullCorrelation[]}>(verticalCorrelations)
+    const [sortKey, setSortKey] = useState<'rho' | 'mean' | 'sd' | 'prominence'>('mean')
 
     useEffect(() => {
         // Sort correlations by rho. Then assign to corrs.
@@ -228,7 +233,7 @@ export const VerticalCorrelations = ({ verticals, verticalCorrelations, title }:
             acc[key] = verticalCorrelations[key]
             .sort((a, b) => b[sortKey] - a[sortKey])
             return acc
-        }, {} as {[key:string]:iCorrelation[]})
+        }, {} as {[key:string]:iFullCorrelation[]})
 
         setCorrelations(sorted)
     }, [verticalCorrelations, sortKey])
@@ -236,14 +241,23 @@ export const VerticalCorrelations = ({ verticals, verticalCorrelations, title }:
 return <table className='table is-fullwidth'>
     <thead>
         <tr className={'is-light'}>
-            <th colSpan={(verticals.length)*4} style={{color:'black', textAlign:'center'}}> 
-                { title || 'Vertical Correlations' }
+            <th colSpan={(verticals.length)*5 -2} style={TH_STYLE}> 
+                { 'Vertical Correlations' }
             </th>
+
+            <th colSpan={2}>
+                <Dropdown text={'Actions'} color='is-info'/>
+            </th>            
         </tr>
 
         <tr className={'is-light'}>
             { verticals.map((v, i) => 
-                <th style={{color:'black', textAlign:'center'}} colSpan={4} key={i}> {v} </th>
+                <th 
+                    style={{...TH_STYLE, cursor:'pointer'}} 
+                    onClick={() => setAction({ type:'VERTICAL', value:v })} 
+                    colSpan={5} 
+                    key={i}
+                > {v} </th>
             )}
         </tr>
 
@@ -253,6 +267,9 @@ return <table className='table is-fullwidth'>
                 <th style={TABLE_CLICK_STYLE} onClick={() => setSortKey('mean')}> Mean </th>
                 <th style={TABLE_CLICK_STYLE} onClick={() => setSortKey('sd')}> SD </th>
                 <th style={TABLE_CLICK_STYLE} onClick={() => setSortKey('rho')}> Rho </th>
+                <th style={TABLE_CLICK_STYLE} onClick={() => setSortKey('prominence')}> 
+                    <abbr title="Prevalence"> % </abbr> 
+                </th>
             </>)
             }
         </tr>
@@ -263,12 +280,19 @@ return <table className='table is-fullwidth'>
 		{
 			[...Array(5)].map((_, i) => <tr>
                 { verticals.map((v) => {
-                    const { label, rho, mean, sd } = correlations[v][i] || {}
+                    const { label, rho, mean, sd, prominence } = correlations[v][i] || {}
                     return <>
-                        <td style={i===4 ? {borderBottom: '1px dashed white'} : {}}> { label } </td>
+                        <td 
+                            style={{
+                                cursor:'pointer', 
+                                borderBottom: i===4 ? '1px dashed white' : 'auto'
+                            }}
+                            onClick={() => setAction({ type:'ATTRIBUTE', value:label })}
+                        > { label } </td>
                         <TD value={ mean } dashed={i===4}/>
                         <TD value={ sd } dashed={i===4}/>
                         <TD value={ rho } dashed={i===4}/>
+                        <TD value={ prominence } dashed={i===4}/>
                     </>
                 })}
 			</tr>)
@@ -277,12 +301,16 @@ return <table className='table is-fullwidth'>
 		{
 			[...Array(5)].map((_, i) => <tr>
                 { verticals.map((v) => {
-                    const { label, rho, mean, sd } = correlations[v][correlations[v].length -5 +i] || {}
+                    const { label, rho, mean, sd, prominence } = correlations[v][correlations[v].length -5 +i] || {}
                     return <>
-                        <td> { label } </td>
+                        <td 
+                            style={{ cursor:'pointer' }}
+                            onClick={() => setAction({ type:'ATTRIBUTE', value:label })}
+                        > { label } </td>
                         <TD value={ mean } />
                         <TD value={ sd } />
                         <TD value={ rho } />
+                        <TD value={ prominence } />
                     </>
                 })}
 			</tr>)

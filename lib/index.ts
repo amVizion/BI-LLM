@@ -7,7 +7,7 @@
     6. Write report
 */
 
-import { ATTRIBUTE_STORE_PATH, readConfig, iConfig } from './pipelines/index'
+import { ATTRIBUTE_STORE_PATH, readConfig, iConfig, getVerticalLabels } from './pipelines/index'
 import { iEmbeddedText, iLabeledText, tScore } from './utils/types' // Import the iConfig type
 import { embed, reduce } from './pipelines/1.ERL'
 import { clusterTexts } from './pipelines/2.SPC'
@@ -16,8 +16,9 @@ import { readFileSync } from 'fs'
 
 import MLR from 'ml-regression-multivariate-linear'
 
-const predictScores = async(texts:iEmbeddedText[], config:iConfig) => {
-    const { verticals, verticalLabels } = config
+export const predictScores = async(texts:iEmbeddedText[], config:iConfig) => {
+    const { verticals } = config
+    const verticalLabels = getVerticalLabels(verticals)
 
     // Get predictor.
     const getPredictor = (vertical:string) => {
@@ -71,4 +72,4 @@ const index = async() => {
     await cdvPipeline(clusteredTexts, clusters, config)
 }
 
-index().catch(console.error)
+// index().catch(console.error)

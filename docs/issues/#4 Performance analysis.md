@@ -16,7 +16,8 @@ Solution will start by reusing existing pipeline, but integrating it with vertic
 
 As a final step to demonstrate the business value of the analysis, the research will be supplied to GPT-4 to make informed predictions of unseen videos, and predict the outcome. A simple comparisson will be drawn against a baseline with the expected views from the channel. For that, is important to supplement the report with views above expectation for each individual cluster, and for each video (based on embeddings). As a posible last step include the representation of the optimal weights within the analysis to explain how each dimension contributes to the outcome of the video.
 
-Development Roadmap
+### Development Roadmap
+
 - [x] Update pipeline to support AttributeStore.
 - [x] Analysis by vertical on BI report.
 - [x] Enhance tables to show vertical on predictions.

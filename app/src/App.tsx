@@ -1,10 +1,11 @@
+import { iFullCorrelation, iVerticals, tVerticalCorrelations } from './utils/types'
+import correlations from './data/verticals.json'
 import { NavBar, Footer } from './components/Layout'
-import { ClusterView } from './views/ClusterView'
-import { Report } from './views/Report'
+// import { ClusterView } from './views/ClusterView'
+// import { Report } from './views/Report'
 import { Items } from './views/Items'
 
-import REPORT from './data/report.json'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import 'bulma/css/bulma.css'
 import './App.css'
 
@@ -19,17 +20,35 @@ const SECTION_STYLE = {
 }
 
 const App = () => {
-  const [view, setView] = useState<string>()
+	const [view, setView] = useState<string>()
+	const [verticalCorrelations, setVerticalCorrelations] = useState<iVerticals>()
+
+	useEffect(() => {
+		// Iterate by vertical (key), and add an extra attribute to each element in the dictionary.
+		const { labelCorrelations } = correlations
+		const fullCorrelations:tVerticalCorrelations = Object.keys(labelCorrelations).reduce((acc, key) => {
+			const correlations = labelCorrelations[key as keyof typeof labelCorrelations]
+			const fullCorrelations:iFullCorrelation[] = correlations.map(d => ({ ...d, prominence: d.rho * d.mean }))
+			return { ...acc, [key]: fullCorrelations }
+		}, {})
+
+		setVerticalCorrelations({...correlations, verticalCorrelations:fullCorrelations })
+	}, [])
+
+
+	if(!verticalCorrelations) return <div className='section' style={SECTION_STYLE} /> 
 
 	return <>
 		<NavBar setView={setView}/>
 			<div className='section' style={SECTION_STYLE}>
-				{ view === REPORT_VIEW && <Report {...REPORT} /> }
-				{ view === CLUSTER_VIEW && <ClusterView /> }
-				{ (!view || view === ITEM_VIEW) && <Items /> }
+				{ 
+					// view === REPORT_VIEW && <Report /> }
+					// view === CLUSTER_VIEW && <ClusterView {...verticalCorrelations}/> }
+				}
+				{ (!view || view === ITEM_VIEW) && <Items {...verticalCorrelations} /> }
 			</div>
 		<Footer />
 	</>
-};
+}
 
 export default App

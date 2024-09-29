@@ -72,7 +72,7 @@ const LABELS_PATH = 'A.4. Labels.json'
 const VERTICAL_LABELS_PATH = 'A.5. VerticalLabels.json'
 
 // Embed
-export const embed = async(texts:iInputText[], {path='', skipWrite}:iErcConfig) => {
+export const embed = async(texts:iInputText[], {path='', skipWrite=true}:iErcConfig) => {
     const model = await use.load()
 
     const tensors = await model.embed(texts.map(({ text }) => text))
@@ -92,7 +92,7 @@ export const embed = async(texts:iInputText[], {path='', skipWrite}:iErcConfig) 
 
 // Reduce
 export const reduce = async(texts:iEmbeddedText[], config:iErcConfig):Promise<iEmbeddedText[]> => {
-    const { path, nComponents=5, pcaModelPath, skipWrite } = config
+    const { path, nComponents=5, pcaModelPath, skipWrite=true } = config
 
     const embeddings = texts.map(({ embeddings }) => embeddings)
     const getPCA = async():Promise<PCA> => {
