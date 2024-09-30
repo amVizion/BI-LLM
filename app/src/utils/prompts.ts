@@ -212,7 +212,44 @@ Videos below the median:
 ${belowMedian.map(({ text }) => `- ${text}`).join('\n')}
 `}
 
-export const getSimilarityPrompt = ``
+export const getSimilarityPrompt = (text:iItem, texts:iItem[]) => {
+    // Get Euclidean distance between text and all other texts.
+    const distances = texts.map(({ embeddings }) => {
+        const distance = Math.sqrt(embeddings.reduce((acc, v, i) => acc + Math.pow(v - text.embeddings[i], 2), 0))
+        return distance
+    })
+
+    // Get the 10 closest texts.
+    const closestTexts = distances.map((d, i) => ({ distance: d, text: texts[i] }))
+    .sort((a, b) => a.distance - b.distance).slice(1, 11).map(({ text }) => text)
+
+    // Get closest videos that performed better.
+    const abovePerformance = closestTexts.filter(({ output }) => output > text.output)
+
+    // Get closest videos that performed worse.
+    const belowPerformance = closestTexts.filter(({ output }) => output <= text.output)
+
+    const task = `explains the performance of a video related to similar videos.`
+    const { q2 } = getQuartile(texts.map(({ output }) => output))
+
+    return `${instructionsPrompt(task)}
+
+Video title: 
+${text.text}
+
+Similar videos that performed better:
+${abovePerformance.map(({ text }) => `- ${text}`).join('\n')}
+
+Similar videos that performed worse:
+${belowPerformance.map(({ text }) => `- ${text}`).join('\n')}
+
+Your decision will determine if the channel should continue publishing similar videos.
+And if so, how to optimize those videos to improve performance.
+Else, what other types of videos should be considered.
+
+The video had ${text.output} views, while the channel's median is ${q2} views.
+`
+}
 
 
 export const getTopVideosPrompt = (texts:iItem[]) => {

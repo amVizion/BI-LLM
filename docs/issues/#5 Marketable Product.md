@@ -15,16 +15,36 @@ The growth section would start by identifying the niche based on the titles. Nex
 
 ### Development Roadmap 
 
-- [ ] Introduction describing the channel's content.
-- [ ] Analysis of engagement by vertical.
-- [ ] Subsection of content to avoid.
-- [ ] Examples of titles that encapsulate the attributes.
-- [ ] Differentiation between similar titles or attributes.
+- [x] Introduction describing the channel's content.
+- [x] Analysis of engagement by vertical.
+- [x] Subsection of content to avoid.
+- [x] Examples of titles that encapsulate the attributes.
+- [x] Differentiation between similar titles or attributes.
 
 - [ ] Niche identification.
 - [ ] Comments insights & summarization.
-- [ ] Topics & titles that resonate with the audience.
+- [ ] Topics & titles that resonate with the niche audience.
 - [ ] Metrics comparison with competition.
 
-- [ ] Personalized conclusion with vision for channel.  
+- [x] Personalized conclusion with vision for channel.  
 
+
+### Observations
+
+1. The comment data will be handled during multimodal data.
+2. The niche identification will be an after tast of the categorical segmentation. 
+3. After the categorical segmentation. The second industry solution will be demoed.
+4. A multi-agent system will be used to generate the report based on prompts.
+5. A refactor is required for the Correlate step in the pipeline.
+
+For the multi-agent system the following agents have been identified:
+
+- Analysts:
+    - Attribute analyst.
+    - Video performance analyst
+
+- Writers:
+    - Summarizer.
+    - Critic.
+    - Orchestrator.
+    - Predictor.

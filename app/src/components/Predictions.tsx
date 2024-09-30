@@ -1,16 +1,29 @@
+import { CSSProperties, useEffect, useState } from "react"
 import CORRELATIONS from '../data/correlations.json'
 import { iCluster, iItem } from "../utils/types"
 import { numberFormater } from "../utils/utils"
-import { CSSProperties, useEffect, useState } from "react"
-import axios from "axios"
+import { iAction } from '../views/Items'
+import { tScore } from "../utils/types"
 import { Dropdown } from './PromptBox'
 
+import axios from "axios"
 
-const TABLE_HEADER_STYLE:CSSProperties = {color:'black', textAlign:'center', verticalAlign:'middle'}
+
+const TABLE_HEADER_STYLE:CSSProperties = {
+    color:'black', 
+    textAlign:'center', 
+    verticalAlign:'middle'
+}
+
 const API_URL = 'http://localhost:3000'
 
-interface iPrediction {items:iItem[], clusters?:iCluster[]}
-export const Predictions = ({items, clusters}:iPrediction) => {
+interface iPrediction {
+    items:iItem[]
+    clusters?:iCluster[]
+    setAction:(action:iAction)=>void
+}
+
+export const Predictions = ({items, clusters, setAction}:iPrediction) => {
     const [predictions, setPredictions] = useState<iItem[]>(items)
 
     const makePrediction = async(item:iItem) => {
@@ -44,6 +57,11 @@ export const Predictions = ({items, clusters}:iPrediction) => {
         axios.post(url, { predictions: summarizedPredictions })
 
     }, [predictions, items])
+
+    const getColor = (item:tScore) => CORRELATIONS.find(({label}) => 
+        item.label === label
+    )!.rho > 0 ? 'palegreen' : 'lightcoral'
+
 
     return <div className="table-container">
 <table className='table is-fullwidth'>
@@ -87,16 +105,20 @@ export const Predictions = ({items, clusters}:iPrediction) => {
                     ? -1 : 1
             )
             return <tr key={i}>
-                <td style={{maxWidth:360}}> {f.text} </td>
+                <td 
+                    style={{maxWidth:360, cursor:'pointer'}} 
+                    onClick={() => setAction({type:'SIMILAR', value:f})}
+                > {f.text} </td>
                 <td style={{textAlign:'center'}}> {numberFormater(f.output)} </td>
                 <td style={{textAlign:'center'}}> {numberFormater(f.prediction)} </td>
                 { clusters && <td> {clusters[f.cluster].name} </td> }
 
                 { [...Array(5)].map((_, i) => 
                     <td 
-                        style={{color:CORRELATIONS.find(({label}) => sortedLabels[i].label === label)!.rho > 0 ? 'palegreen' : 'lightcoral'}}> 
-                    { sortedLabels[i].label } ({Math.round(sortedLabels[i].score)})
-                </td>)}
+                        onClick={() => setAction({type:'ATTRIBUTE', value:sortedLabels[i].label })}
+                        style={{ cursor:'pointer', color: getColor(sortedLabels[i]) }}
+                    >  { sortedLabels[i].label } ({Math.round(sortedLabels[i].score)}) </td>
+                )}
             </tr>
         })}
     </tbody>

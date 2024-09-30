@@ -1,5 +1,5 @@
+import { getAnalysisPrompt, getIntroductionPrompt, getSummaryPrompt, getSimilarityPrompt } from "../utils/prompts"
 import { getTopAttributesPrompt, getWorstAttributesPrompt, getVerticalPrompt } from "../utils/prompts"
-import { getAnalysisPrompt, getIntroductionPrompt, getSummaryPrompt } from "../utils/prompts"
 import { getTopVideosPrompt, getWorstVideosPrompt, getAttributePrompt } from "../utils/prompts"
 
 import { VerticalCorrelations } from '../components/Correlations'
@@ -7,12 +7,12 @@ import { Predictions } from '../components/Predictions'
 import { PromptBox } from '../components/PromptBox'
 import { Chart } from "../components/Chart"
 
-import { iVerticals } from '../utils/types'
+import { iVerticals, iItem } from '../utils/types'
 import { useEffect, useState } from 'react'
 import DATA from '../data/data.json'
 
 
-export interface iAction { type:string, value?:string }
+export interface iAction { type:string, value?:string|iItem }
 export const Items = ({ verticals, verticalCorrelations }:iVerticals) => {
 	const [prompt, setPrompt] = useState<string>('')
     const [action, setAction] = useState<iAction>()
@@ -27,10 +27,11 @@ export const Items = ({ verticals, verticalCorrelations }:iVerticals) => {
 			WORST_ATTRS: () => getWorstAttributesPrompt(verticalCorrelations, DATA),
 			SUMMARY: () => getSummaryPrompt(DATA),
 			ANALYSIS: () => getAnalysisPrompt(DATA),
-            VERTICAL: () => getVerticalPrompt(value!, verticalCorrelations),
+            VERTICAL: () => getVerticalPrompt(value!  as string, verticalCorrelations),
             TOP_VIDEOS: () => getTopVideosPrompt(DATA),
             WORST_VIDEOS: () => getWorstVideosPrompt(DATA),
-            ATTRIBUTE:() => getAttributePrompt(value!, DATA)
+            ATTRIBUTE:() => getAttributePrompt(value! as string, DATA),
+            SIMILAR:() => getSimilarityPrompt(value! as iItem, DATA)
 		}[type]
 
 		setPrompt(prompt || '')
@@ -47,6 +48,9 @@ export const Items = ({ verticals, verticalCorrelations }:iVerticals) => {
             verticalCorrelations={verticalCorrelations!} 
         />
 
-        <Predictions items={DATA.sort((a, b) => b.output - a.output)}/>
+        <Predictions 
+            items={DATA.sort((a, b) => b.output - a.output)}
+            setAction={setAction}
+        />
     </div>
 }

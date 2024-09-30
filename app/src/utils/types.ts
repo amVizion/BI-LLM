@@ -1,5 +1,5 @@
 
-type tScore = { label:string, score:number }
+export type tScore = { label:string, score:number }
 export type tAttribute = { 
     label:string
     average:number
