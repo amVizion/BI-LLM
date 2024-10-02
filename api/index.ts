@@ -44,15 +44,27 @@ app.post('/prediction', async({ body }, res) => {
     return res.send(response)
 })
 
-app.post('/writeFile', async({ body }, res) => {
+app.post('/write/predictions', async({ body }, res) => {
     // Get text from body:
     const { predictions } = body
 
     // Write to file:
     const jsonPredictions = JSON.stringify(predictions, null, 2)
-    writeFileSync('predictions.json', jsonPredictions)
+    writeFileSync('ignore/predictions.json', jsonPredictions)
+
+    res.send(200)
 })
 
+app.post('/write/clusters', async({ body }, res) => {
+    // Get text from body:
+    const { clusters } = body
+
+    // Write to file:
+    const jsonClusters = JSON.stringify(clusters, null, 2)
+    writeFileSync('ignore/clusters.json', jsonClusters)
+
+    res.send(200)
+})
 
 app.listen(port, () => console.log(`amVizion API running on port ${port}`))
 

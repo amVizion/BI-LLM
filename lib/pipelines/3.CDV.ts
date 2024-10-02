@@ -31,7 +31,7 @@ Correlate Describe Visualize (CDV) Pipeline:
 
 */
 
-import { iVerticals, iCorrelation, iCluster, iReport, iClusterReport, iReportAnalysis } from '../../app/src/utils/types'
+import { iVerticals, iCorrelation, iReport, iClusterReport, iReportAnalysis } from '../../app/src/utils/types'
 import { getIntro, getClusterAnalysis, writeConclusion, tLabelPrompt, writeAnalysis, getTitle } from '../utils/prompts'
 import { iClusteredText, iResearchContext, tVerticalLabels } from '../utils/types'
 import { iRawCluster, iColoredCluster } from '../utils/types'
@@ -39,7 +39,7 @@ import { iRawCluster, iColoredCluster } from '../utils/types'
 import { PolynomialRegression } from 'ml-regression-polynomial'
 import MLR from 'ml-regression-multivariate-linear'
 import { writeFile } from 'fs/promises'
-import { getVerticalLabels } from '.'
+import { getVerticalLabels, iConfig } from '.'
 
 
 export interface iCdvConfig {
@@ -49,6 +49,34 @@ export interface iCdvConfig {
     context?:iResearchContext
     verticalLabels?: tVerticalLabels
 }
+
+export type tAttribute = { 
+    label:string
+    average:number
+    prevalence:number | null
+    correlation:number
+    causality:number | null
+}
+
+
+export interface iCluster { 
+    index:number
+
+    name?:string
+    summary?: string
+    description?: string
+
+    size:number
+    color:string
+    center:number[] 
+    centroid:number[]
+    avgOutput:number
+    attributes: tAttribute[]
+
+    subClusters?: iCluster[]
+    verticalAttributes?: {[vertical:string]:tAttribute[]}
+}
+
 
 export const correlate = async(texts:iClusteredText[], clusters: iRawCluster[], config:iCdvConfig) => {
     const { path } = config
@@ -301,27 +329,27 @@ interface iVisualizeInput {
     report?:iReport
 }
 
-const visualize = async(input:iVisualizeInput) => {
-    const APP_DIR = '../app/src/data'
+const write = async(input:iVisualizeInput, config:iConfig) => {
     const { correlations, clusters, texts, report, verticalCorrelations={} } = input
+    const dir = config.outputPath || '../app/src/data'
 
-    await writeFile(`${APP_DIR}/data.json`, JSON.stringify(texts, null, 4))
-    await writeFile(`${APP_DIR}/correlations.json`, JSON.stringify(correlations, null, 4))
-    await writeFile(`${APP_DIR}/verticals.json`, JSON.stringify(verticalCorrelations, null, 4))    
+    await writeFile(`${dir}/data.json`, JSON.stringify(texts, null, 4))
+    await writeFile(`${dir}/correlations.json`, JSON.stringify(correlations, null, 4))
+    await writeFile(`${dir}/verticals.json`, JSON.stringify(verticalCorrelations, null, 4))    
 
     if(!clusters || ! report) return
 
-    await writeFile(`${APP_DIR}/report.json`, JSON.stringify(report, null, 4))
-    await writeFile(`${APP_DIR}/clusters.json`, JSON.stringify(clusters, null, 4))
+    await writeFile(`${dir}/report.json`, JSON.stringify(report, null, 4))
+    await writeFile(`${dir}/clusters.json`, JSON.stringify(clusters, null, 4))
 
     return
 }
 
-export const cdvPipeline = async(texts:iClusteredText[], rawClusters:iRawCluster[], config:iCdvConfig) => {
+export const cdvPipeline = async(texts:iClusteredText[], rawClusters:iRawCluster[], config:iConfig) => {
     console.log('Starting CDV Pipeline.')
     const correlated = await correlate(texts, rawClusters, config)
-    if(!config.context) return await visualize({...correlated, texts, })
+    if(!config.context) return await write({...correlated, texts, }, config)
     
     const { report, clusters } = await describe({ ...correlated, config })
-    return await visualize({ ...correlated, texts, report, clusters })
+    return await write({ ...correlated, texts, report, clusters }, config)
 }

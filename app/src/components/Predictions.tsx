@@ -1,6 +1,5 @@
+import { iCluster, iItem, iCorrelation } from "../utils/types"
 import { CSSProperties, useEffect, useState } from "react"
-import CORRELATIONS from '../data/correlations.json'
-import { iCluster, iItem } from "../utils/types"
 import { numberFormater } from "../utils/utils"
 import { iAction } from '../views/Items'
 import { tScore } from "../utils/types"
@@ -15,20 +14,21 @@ const TABLE_HEADER_STYLE:CSSProperties = {
     verticalAlign:'middle'
 }
 
-const API_URL = 'http://localhost:3000'
+export const API_URL = 'http://localhost:3000'
 
 interface iPrediction {
     items:iItem[]
     clusters?:iCluster[]
+    correlations:iCorrelation[]
     setAction:(action:iAction)=>void
 }
 
-export const Predictions = ({items, clusters, setAction}:iPrediction) => {
+export const Predictions = ({items, clusters, correlations, setAction}:iPrediction) => {
     const [predictions, setPredictions] = useState<iItem[]>(items)
 
     const makePrediction = async(item:iItem) => {
         try{
-            const url = `${API_URL}/prediction`
+            const url = `${API_URL}/write/predictions`
             const { data } = await axios.post(url, { text:item.text })
             const prediction = Number(data)
             if(isNaN(prediction)) throw new Error('Prediction is not a number')
@@ -58,16 +58,19 @@ export const Predictions = ({items, clusters, setAction}:iPrediction) => {
 
     }, [predictions, items])
 
-    const getColor = (item:tScore) => CORRELATIONS.find(({label}) => 
-        item.label === label
-    )!.rho > 0 ? 'palegreen' : 'lightcoral'
+    const getColor = (item:tScore) => {
+        const { mean, rho } = correlations.find(({label}) => item.label === label)!
 
+        if(item.score > mean && rho > 0) return 'palegreen'
+        if(item.score < mean && rho < 0) return 'palegreen'
+        return 'lightcoral'
+    }
 
     return <div className="table-container">
 <table className='table is-fullwidth'>
     <thead>
         <tr className={'is-light'}>
-            <th style={TABLE_HEADER_STYLE} colSpan={6}> 
+            <th style={TABLE_HEADER_STYLE} colSpan={clusters ? 7 : 6}> 
                 Predictions Table 
             </th>
             <th>
@@ -100,8 +103,8 @@ export const Predictions = ({items, clusters, setAction}:iPrediction) => {
         .map((f, i) => {
 
             const sortedLabels = f.labels.sort((a, b) => 
-                Math.abs(a.score * CORRELATIONS.find(({label}) => a.label === label)!.rho) > 
-                Math.abs(b.score * CORRELATIONS.find(({label}) => b.label === label)!.rho)
+                Math.abs(a.score * correlations.find(({label}) => a.label === label)!.rho) > 
+                Math.abs(b.score * correlations.find(({label}) => b.label === label)!.rho)
                     ? -1 : 1
             )
             return <tr key={i}>
@@ -111,7 +114,7 @@ export const Predictions = ({items, clusters, setAction}:iPrediction) => {
                 > {f.text} </td>
                 <td style={{textAlign:'center'}}> {numberFormater(f.output)} </td>
                 <td style={{textAlign:'center'}}> {numberFormater(f.prediction)} </td>
-                { clusters && <td> {clusters[f.cluster].name} </td> }
+                { clusters && <td> {clusters[f.cluster].name || clusters[f.cluster].index } </td> }
 
                 { [...Array(5)].map((_, i) => 
                     <td 
@@ -123,4 +126,5 @@ export const Predictions = ({items, clusters, setAction}:iPrediction) => {
         })}
     </tbody>
 </table>
-</div>}
+</div>
+}

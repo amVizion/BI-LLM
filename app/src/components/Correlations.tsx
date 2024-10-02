@@ -9,7 +9,7 @@ For each Cluster:
 
 */
 
-import { iCluster, iCorrelation, iFullCorrelation, tAttribute } from "../utils/types"
+import { iCluster, iCorrelation, iFullCorrelation, tClusterAttrStats } from "../utils/types"
 import { CSSProperties, useEffect, useState } from "react"
 import { Dropdown } from "./PromptBox"
 import { iAction } from "../views/Items"
@@ -65,10 +65,10 @@ export const SingleCorrelations = ({ clusters, correlations }:iSingleCorrelation
             <TD value={ sd } />
 
             { clusters.map(({ attributes }) => {
-                const { average, correlation } = attributes.find(({ label:l }) => l === label)!
+                const { mean, attrRho } = attributes.find(({ label:l }) => l === label)!
                 return <>
-                    <TD value={ average } />
-                    <TD value={ correlation } />
+                    <TD value={ mean } />
+                    <TD value={ attrRho } />
                 </>
             })}
         </tr>)
@@ -80,21 +80,21 @@ export const SingleCorrelations = ({ clusters, correlations }:iSingleCorrelation
 interface iClusterAttributes { 
     title?:string 
     verticals:string[], 
-    verticalCorrelations: {[vertical:string]:tAttribute[]}, 
+    verticalCorrelations: {[vertical:string]:tClusterAttrStats[]}, 
 }
 
 // Table that explains the attributes for a given, selected, cluster.
 export const ClusterAttributes = ({ verticals, verticalCorrelations, title }:iClusterAttributes) => {
-    const [correlations, setCorrelations] = useState<{[vertical:string]:tAttribute[]}>(verticalCorrelations)
+    const [correlations, setCorrelations] = useState<{[vertical:string]:tClusterAttrStats[]}>(verticalCorrelations)
 
     useEffect(() => {
         // Sort correlations by rho. Then assign to corrs.
         const sorted = Object.keys(verticalCorrelations).reduce((acc, key) => {
             acc[key] = verticalCorrelations[key]
-            .filter(({ causality }) => causality)
-            .sort(({ causality:a }, { causality:b }) => b! < a! ? -1 : 1)
+            .filter(({ prominence }) => prominence)
+            .sort(({ prominence:a }, { prominence:b }) => b! < a! ? -1 : 1)
             return acc
-        }, {} as {[key:string]:tAttribute[]})
+        }, {} as {[key:string]:tClusterAttrStats[]})
 
         setCorrelations(sorted)
     }, [verticalCorrelations])
@@ -129,12 +129,12 @@ return <table className='table is-fullwidth'>
             [...Array(Math.max(...Object.keys(correlations).map(k => Object.keys(correlations[k]).length)))]
             .map((_, i) => <tr key={i}>
                 { verticals.map((v) => {
-                    const { label, prevalence, correlation, causality } = correlations[v][i] || {}
+                    const { label, deltaRho, attrRho, prominence } = correlations[v][i] || {}
                     return <>
                         <td> { label } </td>
-                        <TD value={ prevalence } />
-                        <TD value={ correlation } />
-                        <TD value={ causality } />
+                        <TD value={ deltaRho } />
+                        <TD value={ attrRho } />
+                        <TD value={ prominence } />
                     </>
                 })}
             </tr>)
@@ -151,8 +151,7 @@ export const ClusterCorrelations = ({ clusters }:{clusters:iCluster[]}) => {
 		// Sort Cluster attributes by causality.
 		const orderedClusters = clusters.map((c) => {
 			const attributes = c.attributes
-            .filter(({ causality, prevalence }) => causality && (prevalence || -1) > 0)
-            .sort(({causality:a}, {causality:b}) => a! > b! ? -1 : 1)
+            .sort(({deltaMean:a}, {deltaMean:b}) => a! > b! ? -1 : 1)
 			return {...c, attributes}
 		})
 		setClusters(orderedClusters)
@@ -161,14 +160,14 @@ export const ClusterCorrelations = ({ clusters }:{clusters:iCluster[]}) => {
 return <div className="table-container">
 	<table className='table is-fullwidth'><thead> 
     <tr className={'is-light'}>
-			<th colSpan={clusters.length*4} style={{color:'black', textAlign:'center'}}> 
+			<th colSpan={clusters.length*3} style={{color:'black', textAlign:'center'}}> 
 				Cluster Correlations 
 			</th>
 		</tr>  
 
 		<tr className={'is-light'}>
 			{ clusters.map(({ name, index })=> 
-				<th colSpan={4} key={index} style={{color:'black', textAlign:'center'}}> 
+				<th colSpan={3} key={index} style={{color:'black', textAlign:'center'}}> 
 					{ name || `Cluster #${index}` } 
 				</th>
 			)}
@@ -178,8 +177,7 @@ return <div className="table-container">
 			{ clusters.map(() => <>
 				<th style={{color:'black'}}> Attribute </th>
 				<th style={{color:'black'}}> <abbr title="Prevalence"> Prev. </abbr></th>
-				<th style={{color:'black'}}> Rho </th>
-				<th style={{color:'black'}}><abbr title="Causality"> Caus. </abbr> </th>
+				<th style={{color:'black'}}><abbr title="Causality"> Rho. </abbr> </th>
 			</>)}
     </tr>
 	</thead>
@@ -190,9 +188,8 @@ return <div className="table-container">
 				{
 					sortedClusters.map(({ attributes }) => <>
 						<td style={i===4 ? {borderBottom: '1px dashed white'} : {}}> { attributes[i].label } </td>
-						<TD value={ attributes[i].prevalence  || 0} dashed={i===4} />
-						<TD value={ attributes[i].correlation } dashed={i===4} />
-						<TD value={ attributes[i].causality || 0 } dashed={i===4} />
+						<TD value={ attributes[i].deltaMean  || 0} dashed={i===4} />
+						<TD value={ attributes[i].attrRho || 0 } dashed={i===4} />
 					</>
 				)}
 			</tr>)
@@ -201,9 +198,8 @@ return <div className="table-container">
 				{
 					sortedClusters.map(({ attributes }) => <>
 						<td> { attributes[attributes.length -5 +i].label } </td>
-						<TD value={ attributes[attributes.length -5 +i].prevalence  || 0} />
-						<TD value={ attributes[attributes.length -5 +i].correlation } />
-						<TD value={ attributes[attributes.length -5 +i].causality || 0 } />
+						<TD value={ attributes[attributes.length -5 +i].deltaMean  || 0} />
+						<TD value={ attributes[attributes.length -5 +i].attrRho || 0 } />
 					</>
 				)}
 			</tr>)
@@ -246,7 +242,11 @@ return <table className='table is-fullwidth'>
             </th>
 
             <th colSpan={2}>
-                <Dropdown text={'Actions'} color='is-info'/>
+                <Dropdown text={'Actions'} color='is-info'>
+                    <a className="dropdown-item" onClick={() => setAction({ type:'CLUSTER' })}> 
+                        Cluster items 
+                    </a>
+                </Dropdown>
             </th>            
         </tr>
 

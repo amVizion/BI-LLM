@@ -4,7 +4,9 @@
   "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "youtube": "npx ts-node youtube/index.ts"
+    "youtube": "npx ts-node youtube/index.ts",
+    "youtube-inference": "npx ts-node youtube/inference.ts",
+    "youtube-channels": "npx ts-node youtube/aggregation.ts"
   },
   "repository": {
     "type": "git",

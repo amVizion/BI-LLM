@@ -52,6 +52,7 @@ export interface iConfig {
     predictor?: MLR // TODO: Implement.
 
     context?:iResearchContext // TODO: Rename "items" prop to "itemsName".
+    outputPath?: string
 }
 
 export const getVerticalLabels = (verticals:string[]) => {
@@ -129,7 +130,7 @@ const main = async() => {
     const spcConfig:iSpcConfig = { ...config, path:SPC_DIR, ...labels }
     const { clusters, clusteredTexts } = await spcPipeline(embeddedTexts, spcConfig)
 
-    const cdvConfig:iCdvConfig = { ...config, path:CDV_CONFIG, ...labels }
+    const cdvConfig:iConfig = { ...config, ...labels }
     await cdvPipeline(clusteredTexts, clusters, cdvConfig)
 }
 

@@ -24,7 +24,7 @@ const pathStyle = {stroke:'black', fill:'transparent', strokeWidth:2 }
 
 type tButtonColor = 'is-primary' | 'is-link' | 'is-info' | 'is-success' | 'is-warning' | 'is-danger' | 'is-white'
 
-interface iDropdown { text:string, children?:JSX.Element[], color?:tButtonColor }
+interface iDropdown { text:string, children?:React.ReactNode, color?:tButtonColor }
 export const Dropdown = ({ text, children, color='is-white' }:iDropdown) => {
 	return <div className="dropdown is-hoverable">
 		<div className="dropdown-trigger">
