@@ -1,18 +1,21 @@
-import { getAnalysisPrompt, getIntroductionPrompt, getSummaryPrompt, getSimilarityPrompt } from "../utils/prompts"
-import { getTopAttributesPrompt, getWorstAttributesPrompt, getVerticalPrompt } from "../utils/prompts"
-import { getTopVideosPrompt, getWorstVideosPrompt, getAttributePrompt } from "../utils/prompts"
-import { clusterItems } from "../utils/utils"
-
+import { getTopAttributesPrompt, attributePerformance, getVerticalPrompt } from '../utils/prompts'
+import { getClusterDescriptionPrompt, channelPerformance, describeChannel } from '../utils/prompts'
+import { getTopVideosPrompt, getWorstVideosPrompt, getSimilarityPrompt } from '../utils/prompts'
+import { attributeTopChannels, describeAttribute, getAttributePrompt } from '../utils/prompts'
+import { getAnalysisPrompt, getIntroductionPrompt, getSummaryPrompt } from '../utils/prompts'
+import { getWorstAttributesPrompt, getClusterPerformancePrompt } from '../utils/prompts'
 import { iItem, tVerticalCorrelations, iCorrelation, iCluster } from '../utils/types'
+import { clusterItems } from '../utils/utils'
+
 import { ClusterCorrelations, VerticalCorrelations } from '../components/Correlations'
 import { Predictions } from '../components/Predictions'
 import { PromptBox } from '../components/PromptBox'
-import { Chart } from "../components/Chart"
+import { Chart } from '../components/Chart'
 
 import { useEffect, useState } from 'react'
 
 
-export interface iAction { type:string, value?:string|iItem }
+export interface iAction { type:string, value?:string|iItem|iCluster, async?:boolean }
 interface iItemsView { 
     items:iItem[], 
     verticals:string[], 
@@ -29,39 +32,78 @@ export const Items = ({ items, verticals, verticalCorrelations, correlations }:i
 
     useEffect(() => {
         if(!action || !verticalCorrelations) return
-        const { type, value } = action
+        const { type, value, async } = action
 
         if(type === 'CLUSTER') {
             const { clusters, clusteredItems } = clusterItems(items, correlations, verticalCorrelations)
             setClusters(clusters)
             setClusteredItems(clusteredItems)
-
-            console.log(clusters, clusteredItems)
             
             return    
         }
 
+        const asyncPrompt = async() => {
+            if(type === 'CHANNEL_DESC') {
+                const prompt = await describeChannel(value! as iItem, correlations)
+                setPrompt(prompt)
+            } 
 
-		const prompt = {
-			INTRO: () => getIntroductionPrompt(verticalCorrelations, items),
-			TOP_ATTRS: () => getTopAttributesPrompt(verticalCorrelations, items),
-			WORST_ATTRS: () => getWorstAttributesPrompt(verticalCorrelations, items),
-			SUMMARY: () => getSummaryPrompt(items),
-			ANALYSIS: () => getAnalysisPrompt(items),
+            if(type === 'CHANNEL_PERF') {
+                const prompt = await channelPerformance(value! as iItem, correlations)
+                setPrompt(prompt)
+            }
+
+            if(type === 'ATTR_DESC') {
+                const prompt = await describeAttribute(value! as string, correlations)
+                setPrompt(prompt)
+            }
+
+            if(type === 'ATTR_PERF') {
+                const prompt = await attributePerformance(value! as string, correlations)
+                setPrompt(prompt)
+            }
+
+            if(type === 'ATTR_CHANNELS') {
+                const attribute = value! as string
+                const prompt = await attributeTopChannels(attribute, items, correlations)
+                setPrompt(prompt)
+            }
+        }
+
+        if(async) {
+            asyncPrompt()
+            return
+        }
+
+        const prompt = {
+            INTRO: () => getIntroductionPrompt(verticalCorrelations, items),
+            TOP_ATTRS: () => getTopAttributesPrompt(verticalCorrelations, items),
+            WORST_ATTRS: () => getWorstAttributesPrompt(verticalCorrelations, items),
+            SUMMARY: () => getSummaryPrompt(items),
+            ANALYSIS: () => getAnalysisPrompt(items),
             VERTICAL: () => getVerticalPrompt(value!  as string, verticalCorrelations),
             TOP_VIDEOS: () => getTopVideosPrompt(items),
             WORST_VIDEOS: () => getWorstVideosPrompt(items),
             ATTRIBUTE:() => getAttributePrompt(value! as string, items),
+
+            CLUSTER_DESC:() => getClusterDescriptionPrompt(value! as iCluster),
+            CLUSTER_PERF:() => getClusterPerformancePrompt(value! as iCluster),
+
             SIMILAR:() => getSimilarityPrompt(value! as iItem, items)
-		}[type] // TODO: Add new high level prop to action interface.
+        }[type] // TODO: Add new high level prop to action interface.
 
-		setPrompt(prompt || '')
-
+        
+        setPrompt(prompt || '')
     }, [action, verticalCorrelations, items, correlations])
 
 
     return <div className='container' style={{maxWidth:1600}}>
-        <Chart data={clusteredItems || items} outputKey='Views' clusters={clusters}/>
+        <Chart 
+            data={clusteredItems || items} 
+            outputKey='Views' 
+            clusters={clusters} 
+            setAction={setAction}
+        />
         <PromptBox prompt={prompt} setAction={setAction} setPrompt={setPrompt}/>
 
         <VerticalCorrelations 
@@ -70,7 +112,7 @@ export const Items = ({ items, verticals, verticalCorrelations, correlations }:i
             verticalCorrelations={verticalCorrelations!} 
         />
 
-        { clusters && <ClusterCorrelations clusters={clusters} /> }
+        { clusters && <ClusterCorrelations clusters={clusters} setAction={setAction} /> }
 
         <Predictions 
             clusters={clusters}

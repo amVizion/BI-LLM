@@ -18,6 +18,7 @@ export type tClusterAttrStats = {
 
     prominence: number // attrMean * attrRho
     clusterProminence: number // mean * rho
+    causality: number // deltaMean * attrRho
 }
 
 export interface iCorrelation { label:string, rho:number, mean:number, sd:number }
@@ -54,6 +55,7 @@ export interface iCluster {
     description?: string
 
     size:number
+    rank:number
     color:string
     center:number[] 
     centroid:number[]
@@ -72,6 +74,7 @@ export interface iItem {
     prediction:number
     cluster:number
     center:number[]
+    category?:string
 }
 
 export interface iScatterData {

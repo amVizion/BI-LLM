@@ -1,6 +1,8 @@
-import { iFullCorrelation, tVerticalCorrelations, iItem } from './types'
+import { iFullCorrelation, tVerticalCorrelations, iItem, iCluster, iCorrelation, tScore } from './types'
 import { kMeansCluster } from 'simple-statistics'
 import data from '../data/data.json'
+import { API_URL } from '../components/Predictions'
+import axios from 'axios'
 
 type tStat = 'rho' | 'mean' | 'sd' | 'prominence'
 
@@ -159,7 +161,6 @@ ${sortedTexts.map(({ text, output }) => `- ${text}: ${output} views`).join('\n')
 `}
 
 
-
 export const getVerticalPrompt = (vertical:string, correlations:tVerticalCorrelations) => {
     // For the given vertical select the top attributes by mean, and prominence.
     const attributes = orderAttributes({sortKey: 'mean', correlations})
@@ -275,3 +276,262 @@ ${worstTexts.map(t => `- ${t}`).join('\n')}
 `
 }
 
+// ---------- CLUSTER PROMPTS --------------
+
+export const getClusterDescriptionPrompt = (cluster:iCluster) => {
+    // Get the most common cluster attributes by mean.
+    const topAttrs = cluster.attributes.sort((a, b) => b.mean - a.mean).slice(0, 10)
+
+    // Get the most differentiating attributes by deltaMean.
+    const deltaAttrs = cluster.attributes.sort((a, b) => b.deltaMean - a.deltaMean).slice(0, 10)
+
+    const task = `describes the content of the cluster.`
+
+    return `${instructionsPrompt(task)}
+
+Most common attributes: 
+${topAttrs.map(({ label }) => `${label}`).join(', ')}
+
+Most differentiating attributes with respect to the rest of the clusters:
+${deltaAttrs.map(({ label }) => `${label}`).join(', ')}
+
+Start by giving the cluster a name. Then, a one-line summary. 
+Finally, a detailed description of the content of the cluster.
+`}
+
+export const getClusterPerformancePrompt = (cluster:iCluster) => {
+    // Get the attributes with the highes causality.
+    const highestCause = cluster.attributes.filter(({ deltaMean }) => deltaMean > 0)
+    .sort((a, b) => b.causality - a.causality).slice(0, 10)
+
+    // Get the attributes with the lowest causality.
+    const lowestCause = cluster.attributes
+    .filter(({ deltaMean }) => deltaMean > 0)
+    .sort((a, b) => a.causality - b.causality).slice(0, 10)
+
+    const task = `explains what drives performance for the cluster.`
+
+    return `${instructionsPrompt(task)}
+
+Attributes that drive performance positively:
+${highestCause.map(({ label }) => `${label}`).join(', ')}
+
+Attributes that drive performance negatively:
+${lowestCause.map(({ label }) => `${label}`).join(', ')}
+
+The cluster rank is ${cluster.rank} out of 5 total clusters (lower is better).
+`
+}
+
+const getVideos = async(channel:string) => {
+    const VIDEOS_API = `${API_URL}/videos/channel/${channel}`
+    const { data } = await axios.get(VIDEOS_API)
+    return data as iItem[]
+}
+
+
+const getDelta = (attr:tScore, correlations:iCorrelation[]) => {
+    const { mean } = correlations.find(({ label }) => label === attr.label)!
+    return attr.score - mean
+}
+
+const getCausality = (attr:tScore, correlations:iCorrelation[]) => {
+    const delta = getDelta(attr, correlations)
+    const { rho } = correlations.find(({ label }) => label === attr.label)!
+
+    return delta * rho
+}
+
+
+// Includes attributes, and titles.
+export const describeChannel = async(channel:iItem, correlations:iCorrelation[]) => {
+    const videos = await getVideos(channel.text)
+
+    // Get top attributes by mean.
+    const attrs = channel.labels.sort((a, b) => b.score - a.score).slice(0, 10)
+
+
+    // Get top attributes by delta mean 
+    const deltaAttrs = channel.labels.sort((a, b) => 
+        getDelta(b, correlations) - getDelta(a, correlations)
+    ).slice(0, 10)
+
+    const task = `describes the content of the channel.`
+
+    return `${instructionsPrompt(task)}
+
+Most common attributes:
+${attrs.map(({ label }) => `${label}`).join(', ')}
+
+Most differentiating attributes with respect to the rest of the channels:
+${deltaAttrs.map(({ label }) => `${label}`).join(', ')}
+
+Videos:
+${videos.map(({ text }) => `- ${text}`).join('\n')}
+
+Start by giving the channel a name. Then, a one-line summary. 
+Finally, a detailed description of the content of the channel.
+`}
+
+export const channelPerformance = async(channel:iItem, correlations:iCorrelation[]) => {
+    const videos = await getVideos(channel.text)
+
+    const topVideos = videos.sort((a, b) => b.output - a.output).slice(0, 10)
+    const worstVideos = videos.sort((a, b) => a.output - b.output).slice(0, 10)
+
+    const positiveCausality = channel.labels.filter(label => getDelta(label, correlations) > 0).
+        sort((a, b) => getCausality(b, correlations) - getCausality(a, correlations)).slice(0, 10)
+
+    const negativeCausality = channel.labels.filter(label => getDelta(label, correlations) > 0)
+    .sort((a, b) => getCausality(a, correlations) - getCausality(b, correlations)).slice(0, 10)
+
+    const task = `explains what drives performance for the channel.`
+
+    return `${instructionsPrompt(task)}
+
+Attributes that drive performance positively:
+${positiveCausality.map(({ label }) => `${label}`).join(', ')}
+
+Attributes that drive performance negatively:
+${negativeCausality.map(({ label }) => `${label}`).join(', ')}
+
+Top videos:
+${topVideos.map(({ text }) => `- ${text}`).join('\n')}
+
+Worst videos:
+${worstVideos.map(({ text }) => `- ${text}`).join('\n')}
+
+The channel had average ${channel.output} views.
+` // TODO: Add channels median.
+}
+
+
+export const describeAttribute = async(attribute:string, correlations:iCorrelation[]) => {
+    // 1. Get videos with the highest score.
+    const { data } = await axios.get(`${API_URL}/videos/attributes/${attribute}/description`)
+    const { videos }:{ videos:iItem[] } = data
+
+    // 2. Get the most common associated attributes.
+    const means = correlations.map(c => {
+        const scores = videos.map(({ labels }) => labels.find(({ label }) => label === c.label)!.score)
+        const mean = scores.reduce((acc, v) => acc + v, 0) / scores.length
+        return { label: c.label, mean }
+    }).filter(({ label }) => label !== attribute)
+
+    const topAttributes = means.sort((a, b) => b.mean - a.mean).slice(0, 10)
+
+
+    // 3. Get the most differentiating attributes.
+    const deltaMeans = means.map(({ label, mean }) => ({ label, 
+        deltaMean: mean - correlations.find(c => c.label === label)!.mean 
+    }))
+
+    const topDelta = deltaMeans.sort((a, b) => b.deltaMean - a.deltaMean).slice(0, 10)
+
+    const task = `explains the content associated with "${attribute}".`
+
+    return `${instructionsPrompt(task)}
+
+Most common attributes in videos with a high score of ${attribute}:
+${topAttributes.map(({ label }) => `${label}`).join(', ')}
+
+Attributes that increase their score on videos with a high score of ${attribute}:
+${topDelta.map(({ label }) => `${label}`).join(', ')}
+
+Videos with a high score of ${attribute}:
+${videos.map(({ text }) => `- ${text}`).join('\n')}
+`}
+    
+export const attributePerformance = async(attribute:string, correlations:iCorrelation[]) => {
+
+    // 1. Get the videos highest scores in the top quartile, and bottom quartile.
+    const { data } = await axios.get(`${API_URL}/videos/attributes/${attribute}/performance`)
+    const { topVideos, bottomVideos }:{ topVideos:iItem[], bottomVideos:iItem[] } = data
+    const { median, attrMedian }:{ median:number, attrMedian: number } = data
+
+    // 2. Get the attributes most correlated with success.
+    const topMeans = correlations.map(c => {
+        const scores = topVideos.map(({ labels }) => labels.find(({ label }) => label === c.label)!.score)
+        const mean = scores.reduce((acc, v) => acc + v, 0) / scores.length
+        const deltaMean = mean - c.mean
+        return { label: c.label, deltaMean }
+    }).sort((a, b) => b.deltaMean - a.deltaMean).slice(0, 10)
+
+    // 3. Get the attributes most correlated with bad performance.
+    const bottomMeans = correlations.map(c => {
+        const scores = bottomVideos.map(({ labels }) => labels.find(({ label }) => label === c.label)!.score)
+        const mean = scores.reduce((acc, v) => acc + v, 0) / scores.length
+        const deltaMean = mean - c.mean
+        return { label: c.label, deltaMean }
+    }).sort((a, b) => b.deltaMean - a.deltaMean).slice(0, 10)
+
+    const task = `explains how ${attribute} drives performance.`
+
+    return `${instructionsPrompt(task)}
+
+Attributes that are common when "${attribute}" videos perform well:
+${topMeans.map(({ label }) => `${label}`).join(', ')}
+
+Attributes that are common when "${attribute}" videos perform poorly:
+${bottomMeans.map(({ label }) => `${label}`).join(', ')}
+
+Videos that perform well with a high score of ${attribute}:
+${topVideos.map(({ text }) => `- ${text}`).join('\n')}
+
+Videos that perform poorly with a high score of ${attribute}:
+${bottomVideos.map(({ text }) => `- ${text}`).join('\n')}
+
+The median number of views for videos of "${attribute}" is ${attrMedian}. 
+While the median for all other videos is ${median} views.
+Consider the difference in performance when analyzing the data.
+Remember, as a data analyst, your job is to find the truth not be nice.
+`}
+
+export const attributeTopChannels = async(attribute:string, items:iItem[], correlations:iCorrelation[]) => {
+    const sortedChannels = items.sort((a, b) =>  b.output - a.output)
+    const topQuartileChannels = sortedChannels.slice(0, Math.floor(sortedChannels.length / 4))
+
+    const channels = topQuartileChannels.sort((a, b) => {
+        const aScore = a.labels.find(({ label }) => label === attribute)!.score
+        const bScore = b.labels.find(({ label }) => label === attribute)!.score
+        return bScore - aScore
+    }).slice(0, 10).map(({ text }) => text)
+    
+    const { data }:{ data:iItem[][] } = await axios.post(`${API_URL}/videos/channels`, { channels })
+
+    const videos = data.flat()
+    const topAttrs = correlations.map(c => {
+        const scores = videos.map(({ labels }) => labels.find(({ label }) => label === c.label)!.score)
+        const mean = scores.reduce((acc, v) => acc + v, 0) / scores.length
+        const deltaMean = mean - c.mean
+        return { label: c.label, deltaMean }
+    }).sort((a, b) => b.deltaMean - a.deltaMean).slice(0, 10)
+
+    const bottomAttrs = correlations.map(c => {
+        const scores = videos.map(({ labels }) => labels.find(({ label }) => label === c.label)!.score)
+        const mean = scores.reduce((acc, v) => acc + v, 0) / scores.length
+        const deltaMean = mean - c.mean
+        return { label: c.label, deltaMean }
+    }).sort((a, b) => a.deltaMean - b.deltaMean).slice(0, 10)
+
+    const task = `explains what content drives performance for "${attribute}" based on the top channels.`
+
+    const attrVideos = data.map(videos => {
+        const sortedVideos = videos.sort((a, b) => 
+            b.labels.find(({ label }) => label === attribute)!.score 
+            - a.labels.find(({ label }) => label === attribute)!.score
+        ).slice(0, 5)
+        return sortedVideos
+    })
+
+    return `${instructionsPrompt(task)}
+
+Attributes that are common on videos from top channels where "${attribute}" videos perform well:
+${topAttrs.map(({ label }) => `${label}`).join(', ')}
+
+Attributes that are less frequent on videos from top channels where "${attribute}" videos perform poorly:
+${bottomAttrs.map(({ label }) => `${label}`).join(', ')}
+
+Videos from top channels with high score for "${attribute}":
+${attrVideos.map((videos, i) => `- ${channels[i]}: ${videos.map(({ text }) => `'${text}'`).join(', ')}`).join('\n\n')}
+`}

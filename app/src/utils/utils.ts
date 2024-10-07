@@ -1,4 +1,4 @@
-import { iItem, iCluster, tClusterAttrStats, iCorrelation, tVerticalCorrelations } from "./types"
+import { iItem, iCluster, tClusterAttrStats, iCorrelation, tVerticalCorrelations, tScore } from "./types"
 import { kMeansCluster } from "simple-statistics"
 
 export const numberFormater = (value:string|number, longFormat?:boolean) => {
@@ -64,13 +64,12 @@ export const clusterItems = (items:iItem[], correlations:iCorrelation[], vertica
                 deltaRho: stats.rho - attr.rho,
 
                 prominence: stats.mean * attr.rho,
-                clusterProminence: stats.mean * stats.rho
+                clusterProminence: stats.mean * stats.rho,
+                causality: (stats.mean - attr.mean) * attr.rho
             }
             
             return attribute
         })
-
-        console.log(verticalCorrelations)
 
         // For every vertical, find the attribute to create the verticalAttributes object.
         type tVerticalAttrs = {[vertical:string]:tClusterAttrStats[]}
@@ -90,12 +89,27 @@ export const clusterItems = (items:iItem[], correlations:iCorrelation[], vertica
             verticalAttributes,
             attributes,
 
+            rank:0,
             color:'',
         }
     })
 
     const outputs = clusters.map(c => c.avgOutput)
-    const coloredClusters = clusters.map((c, i) => ({...c, color: getColors(outputs)[i] }))
+    const sortedOutputs = outputs.slice().sort((a, b) => b - a)
+    const coloredClusters = clusters.map((c, i) => ({
+        ...c, 
+        color: getColors(outputs)[i], 
+        rank: sortedOutputs.indexOf(c.avgOutput) + 1
+    }))
 
     return { clusters:coloredClusters, clusteredItems }
+}
+
+
+export const getTableColor = (item:tScore, correlations:iCorrelation[]) => {
+    const { mean, rho } = correlations.find(({label}) => item.label === label)!
+
+    if(item.score > mean && rho > 0) return 'palegreen'
+    if(item.score < mean && rho < 0) return 'palegreen'
+    return 'lightcoral'
 }

@@ -144,18 +144,20 @@ return <table className='table is-fullwidth'>
 }
 
 // Shows differences across clusters by comparing main attributes. TODO: Rename.
-export const ClusterCorrelations = ({ clusters }:{clusters:iCluster[]}) => {
+interface iClusterCorrelations { clusters:iCluster[], setAction(action:iAction):void }
+export const ClusterCorrelations = ({ clusters, setAction }:iClusterCorrelations) => {
 	const [sortedClusters, setClusters] = useState<iCluster[]>(clusters)
+    const [sortKey, setSortKey] = useState<'deltaMean' | 'causality'>('deltaMean')
 
 	useEffect(() => {
 		// Sort Cluster attributes by causality.
 		const orderedClusters = clusters.map((c) => {
 			const attributes = c.attributes
-            .sort(({deltaMean:a}, {deltaMean:b}) => a! > b! ? -1 : 1)
+            .sort(({[sortKey]:a}, {[sortKey]:b}) => a! > b! ? -1 : 1)
 			return {...c, attributes}
 		})
 		setClusters(orderedClusters)
-	}, [clusters])
+	}, [clusters, sortKey])
 
 return <div className="table-container">
 	<table className='table is-fullwidth'><thead> 
@@ -166,18 +168,27 @@ return <div className="table-container">
 		</tr>  
 
 		<tr className={'is-light'}>
-			{ clusters.map(({ name, index })=> 
-				<th colSpan={3} key={index} style={{color:'black', textAlign:'center'}}> 
-					{ name || `Cluster #${index}` } 
-				</th>
+			{ clusters.map(cluster => 
+				<th 
+                    colSpan={3} 
+                    key={cluster.index} 
+                    onClick={()=> setAction({ type: 'CLUSTER_DESC', value: cluster})}
+                    style={{color:'black', textAlign:'center', cursor:'pointer'}}
+                > { cluster.name || `Cluster #${cluster.index} (${cluster.rank})` } </th>
 			)}
 		</tr>
 
     <tr className={'is-light'}>
 			{ clusters.map(() => <>
 				<th style={{color:'black'}}> Attribute </th>
-				<th style={{color:'black'}}> <abbr title="Prevalence"> Prev. </abbr></th>
-				<th style={{color:'black'}}><abbr title="Causality"> Rho. </abbr> </th>
+				<th 
+                    style={{color:'black', cursor:'pointer'}} 
+                    onClick={()=> setSortKey('deltaMean')}
+                ><abbr title="Prevalence"> Prev. </abbr></th>
+				<th 
+                    style={{color:'black', cursor:'pointer'}}
+                    onClick={()=> setSortKey('causality')}
+                ><abbr title="Causality"> Caus. </abbr> </th>
 			</>)}
     </tr>
 	</thead>
@@ -187,9 +198,14 @@ return <div className="table-container">
 			[...Array(5)].map((_, i) => <tr>
 				{
 					sortedClusters.map(({ attributes }) => <>
-						<td style={i===4 ? {borderBottom: '1px dashed white'} : {}}> { attributes[i].label } </td>
+						<td 
+                            style={{ 
+                                color: sortKey === 'deltaMean' ? attributes[i].attrRho > 0 ? 'palegreen' : 'lightcoral' : 'white', 
+                                borderBottom: i===4 ? '1px dashed white' : 'auto' 
+                            }} 
+                        > { attributes[i].label } </td>
 						<TD value={ attributes[i].deltaMean  || 0} dashed={i===4} />
-						<TD value={ attributes[i].attrRho || 0 } dashed={i===4} />
+						<TD value={ attributes[i].causality || 0 } dashed={i===4} />
 					</>
 				)}
 			</tr>)
@@ -197,9 +213,13 @@ return <div className="table-container">
 			[...Array(5)].map((_, i) => <tr>
 				{
 					sortedClusters.map(({ attributes }) => <>
-						<td> { attributes[attributes.length -5 +i].label } </td>
+						<td
+                            style={{ 
+                                color: sortKey === 'deltaMean' ? attributes[attributes.length -5 +i].attrRho > 0 ? 'lightcoral' : 'palegreen' : 'white', 
+                            }} 
+                        > { attributes[attributes.length -5 +i].label } </td>
 						<TD value={ attributes[attributes.length -5 +i].deltaMean  || 0} />
-						<TD value={ attributes[attributes.length -5 +i].attrRho || 0 } />
+						<TD value={ attributes[attributes.length -5 +i].causality || 0 } />
 					</>
 				)}
 			</tr>)
@@ -222,6 +242,7 @@ const TH_STYLE:CSSProperties = {color:'black', textAlign:'center'}
 export const VerticalCorrelations = ({ verticals, verticalCorrelations, setAction }:iVerticalCorrelations) => {
     const [correlations, setCorrelations] = useState<{[vertical:string]:iFullCorrelation[]}>(verticalCorrelations)
     const [sortKey, setSortKey] = useState<'rho' | 'mean' | 'sd' | 'prominence'>('mean')
+    const [type, setType] = useState<string>('ATTRIBUTE')
 
     useEffect(() => {
         // Sort correlations by rho. Then assign to corrs.
@@ -243,8 +264,21 @@ return <table className='table is-fullwidth'>
 
             <th colSpan={2}>
                 <Dropdown text={'Actions'} color='is-info'>
-                    <a className="dropdown-item" onClick={() => setAction({ type:'CLUSTER' })}> 
+                    <a className="dropdown-item" onClick={() => setAction({type:'CLUSTER'})}>  
                         Cluster items 
+                    </a>
+                    <hr className="dropdown-divider" />
+                    <a className="dropdown-item" onClick={() => setType('ATTRIBUTE')}>  
+                        Attribute by video 
+                    </a>
+                    <a className="dropdown-item" onClick={() => setType('ATTR_DESC')}>  
+                        Attribute description 
+                    </a>
+                    <a className="dropdown-item" onClick={() => setType('ATTR_PERF')}> 
+                        Attribute performance
+                    </a>
+                    <a className="dropdown-item" onClick={() => setType('ATTR_CHANNELS')}>
+                        Attribute performance
                     </a>
                 </Dropdown>
             </th>            
@@ -287,7 +321,7 @@ return <table className='table is-fullwidth'>
                                 cursor:'pointer', 
                                 borderBottom: i===4 ? '1px dashed white' : 'auto'
                             }}
-                            onClick={() => setAction({ type:'ATTRIBUTE', value:label })}
+                            onClick={() => setAction({ type, value:label, async: type !== 'ATTRIBUTE' })}
                         > { label } </td>
                         <TD value={ mean } dashed={i===4}/>
                         <TD value={ sd } dashed={i===4}/>
@@ -305,7 +339,7 @@ return <table className='table is-fullwidth'>
                     return <>
                         <td 
                             style={{ cursor:'pointer' }}
-                            onClick={() => setAction({ type:'ATTRIBUTE', value:label })}
+                            onClick={() => setAction({ type, value:label, async: type !== 'ATTRIBUTE' })}
                         > { label } </td>
                         <TD value={ mean } />
                         <TD value={ sd } />

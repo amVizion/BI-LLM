@@ -14,6 +14,7 @@ import {
 import { iCluster, iItem } from '../utils/types'
 import { numberFormater } from '../utils/utils'
 import { useEffect, useState } from 'react'
+import { iAction } from '../views/Items'
   
 const CHART_MARGIN = { top:20, right:20, bottom:20, left:20 }
 const TOOLTIP_STYLE = {backgroundColor:'white', padding:12, borderColor: '1px solid #f5f5f5', color:'black'}
@@ -42,7 +43,7 @@ interface iClusterChart {
   outputKey?: string
   data: iItem[]
   clusters?: iCluster[]
-  onClick?(index:string):void
+  setAction?(action: iAction):void
 }
 
 interface iColoredItem extends iItem { color:string }
@@ -56,7 +57,7 @@ const COLORS = [
 ]
 
 
-export const Chart = ({ data, outputKey, clusters, onClick }: iClusterChart) => {
+export const Chart = ({ data, outputKey, clusters, setAction }: iClusterChart) => {
   const [items, setItems] = useState<iColoredItem[]>()
 
   // If items are iItems then compute color.
@@ -75,7 +76,7 @@ export const Chart = ({ data, outputKey, clusters, onClick }: iClusterChart) => 
       <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip/>} />
 
       { items && <Scatter 
-        name='Clusters' 
+        name='Items' 
         data={
           items.map(i => ({ 
             title: i.text,
@@ -90,10 +91,12 @@ export const Chart = ({ data, outputKey, clusters, onClick }: iClusterChart) => 
         { 
           items.map((i, k) => 
             <Cell 
-              id={`${'index' in i ? i.index : k}`}
+              id={`${k}`}
               key={`cell-${k}`} 
-              fill={!clusters ? i.color : COLORS[i.cluster]} 
-              onClick={({ target }) => onClick && onClick(Object.values(target)[1].id)} 
+              fill={i.text === 'Anna Stepura: AI for Business' ? 'white'
+                : !clusters ? i.color : COLORS[i.cluster]
+              } 
+              onClick={({ target }) => (Object.values(target)[1].id)} 
             /> 
           )
         }
@@ -116,10 +119,13 @@ export const Chart = ({ data, outputKey, clusters, onClick }: iClusterChart) => 
         { 
           clusters.map((i, k) => 
             <Cell 
-              id={`${'index' in i ? i.index : k}`}
+              id={`${i.index}`}
               key={`cell-${k}`} 
               fill={i.color} 
-              onClick={({ target }) => onClick && onClick(Object.values(target)[1].id)} 
+              onClick={({ target }) => setAction && setAction({
+                type: 'CLUSTER_PERF',
+                value: clusters.find(({ index }) => index.toString() === Object.values(target)[1].id)!
+              })} 
             /> 
           )
         }

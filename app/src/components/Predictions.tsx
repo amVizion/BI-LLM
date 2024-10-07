@@ -1,8 +1,7 @@
 import { iCluster, iItem, iCorrelation } from "../utils/types"
 import { CSSProperties, useEffect, useState } from "react"
-import { numberFormater } from "../utils/utils"
+import { getTableColor, numberFormater } from "../utils/utils"
 import { iAction } from '../views/Items'
-import { tScore } from "../utils/types"
 import { Dropdown } from './PromptBox'
 
 import axios from "axios"
@@ -25,6 +24,7 @@ interface iPrediction {
 
 export const Predictions = ({items, clusters, correlations, setAction}:iPrediction) => {
     const [predictions, setPredictions] = useState<iItem[]>(items)
+    const [type, setType] = useState<string>('SIMILAR')
 
     const makePrediction = async(item:iItem) => {
         try{
@@ -58,14 +58,6 @@ export const Predictions = ({items, clusters, correlations, setAction}:iPredicti
 
     }, [predictions, items])
 
-    const getColor = (item:tScore) => {
-        const { mean, rho } = correlations.find(({label}) => item.label === label)!
-
-        if(item.score > mean && rho > 0) return 'palegreen'
-        if(item.score < mean && rho < 0) return 'palegreen'
-        return 'lightcoral'
-    }
-
     return <div className="table-container">
 <table className='table is-fullwidth'>
     <thead>
@@ -74,7 +66,17 @@ export const Predictions = ({items, clusters, correlations, setAction}:iPredicti
                 Predictions Table 
             </th>
             <th>
-                <Dropdown text={'Actions'} color='is-info'/> 
+                <Dropdown text={'Actions'} color='is-info'>
+                    <a className="dropdown-item" onClick={() => setType('SIMILAR')}> Similarity </a>
+                    <a 
+                        className="dropdown-item" 
+                        onClick={() => setType('CHANNEL_DESC')}
+                    > Describe channel </a>
+                    <a 
+                        className="dropdown-item"
+                        onClick={() => setType('CHANNEL_PERF')}
+                    > Channel performance </a>
+                </Dropdown>
             </th>
 
             <th>
@@ -110,7 +112,7 @@ export const Predictions = ({items, clusters, correlations, setAction}:iPredicti
             return <tr key={i}>
                 <td 
                     style={{maxWidth:360, cursor:'pointer'}} 
-                    onClick={() => setAction({type:'SIMILAR', value:f})}
+                    onClick={() => setAction({type, value:f, async: type !== 'SIMILAR'})}
                 > {f.text} </td>
                 <td style={{textAlign:'center'}}> {numberFormater(f.output)} </td>
                 <td style={{textAlign:'center'}}> {numberFormater(f.prediction)} </td>
@@ -118,8 +120,8 @@ export const Predictions = ({items, clusters, correlations, setAction}:iPredicti
 
                 { [...Array(5)].map((_, i) => 
                     <td 
-                        onClick={() => setAction({type:'ATTRIBUTE', value:sortedLabels[i].label })}
-                        style={{ cursor:'pointer', color: getColor(sortedLabels[i]) }}
+                        onClick={() => setAction({ type:'ATTRIBUTE', value:sortedLabels[i].label })}
+                        style={{ cursor:'pointer', color: getTableColor(sortedLabels[i], correlations) }}
                     >  { sortedLabels[i].label } ({Math.round(sortedLabels[i].score)}) </td>
                 )}
             </tr>

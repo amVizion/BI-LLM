@@ -1,3 +1,10 @@
+import { getAllVideos } from '../solutions/youtube/utils'
+import { callOllama } from '../lib/utils/ollama'
+import { iItem } from '../app/src/utils/types'
+import { writeFileSync } from 'fs'
+import express from 'express'
+import cors from 'cors'
+
 
 const PREDICTION_PROMPT = (youtubeVideo:string) => `
 YouTube channel performance analysis:
@@ -20,10 +27,6 @@ ${youtubeVideo}
 Prediction:`
 
 
-import { callOllama } from '../lib/utils/ollama'
-import { writeFileSync } from 'fs'
-import express from 'express'
-import cors from 'cors'
 
 const app = express()
 app.use(express.json())
@@ -66,5 +69,85 @@ app.post('/write/clusters', async({ body }, res) => {
     res.send(200)
 })
 
-app.listen(port, () => console.log(`amVizion API running on port ${port}`))
+app.get('/videos/channel/:channel', async(req, res) => {
+    const { channel } = req.params
 
+    // Get all videos:
+    const videos = await getAllVideos()
+    const channelVideos = videos.filter(v => v.category === channel)
+    res.send(channelVideos)
+})
+
+app.post('/videos/channels', async(req, res) => {
+    const { channels }:{ channels:string[] } = req.body
+
+    // Get all videos:
+    const allVideos = await getAllVideos()
+    const channelVideos:iItem[][] = channels.map(channel => {
+        const videos = allVideos.filter(v => v.category === channel)
+        const sortedVideos = videos.sort((a, b) => b.output - a.output)
+        const topVideos = sortedVideos.slice(0, 10)
+        return topVideos
+    })
+    
+    res.send(channelVideos)
+})
+
+
+app.get('/videos/attributes/:attribute/description', async(req, res) => {
+    const { attribute } = req.params
+
+    // Get all videos:
+    const videos = await getAllVideos()
+    const sortedVideos = videos.sort((a, b) => 
+        b.labels.find(l => l.label === attribute)!.score 
+        - a.labels.find(l => l.label === attribute)!.score
+    )
+
+    const topVideos = sortedVideos.slice(0, 50)
+
+    res.send({ videos:topVideos })
+})
+
+const getAttributeMedian = (videos:iItem[], attribute:string) => {
+    const sortedVideos = videos.sort((a, b) => 
+        b.labels.find(l => l.label === attribute)!.score 
+        - a.labels.find(l => l.label === attribute)!.score
+    )
+
+    const topVideos = sortedVideos.slice(0, 50)
+    const attrMedian = topVideos.sort((a, b) => a.output - b.output)[Math.floor(topVideos.length / 2)].output
+
+    return attrMedian
+}
+
+app.get('/videos/attributes/:attribute/performance', async(req, res) => {
+    const { attribute } = req.params
+
+    // Get all videos:
+    const videos = await getAllVideos()
+    const sortedVideos = videos.sort((a, b) => b.output - a.output)
+    const median = sortedVideos.sort((a, b) => a.output - b.output)[Math.floor(videos.length / 2)].output
+    const attrMedian = getAttributeMedian(videos, attribute)
+
+    const topQuartile = sortedVideos.slice(0, Math.floor(sortedVideos.length / 4))
+    const bottomQuartile = sortedVideos.slice(Math.floor(sortedVideos.length * 3 / 4))
+
+    const sortedTopQuartile = topQuartile.sort((a, b) => 
+        b.labels.find(l => l.label === attribute)!.score
+        - a.labels.find(l => l.label === attribute)!.score
+    )
+
+    const sortedBottomQuartile = bottomQuartile.sort((a, b) => 
+        b.labels.find(l => l.label === attribute)!.score
+        - a.labels.find(l => l.label === attribute)!.score
+    ) // TODO: Create helper function to sort by attribute.
+
+    const topVideos = sortedTopQuartile.slice(0, 20)
+    const bottomVideos = sortedBottomQuartile.slice(sortedBottomQuartile.length - 20)
+
+    res.send({ topVideos, bottomVideos, median, attrMedian })
+})
+
+
+app.listen(port, () => console.log(`amVizion API running on port ${port}`))
