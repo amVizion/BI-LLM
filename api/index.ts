@@ -1,11 +1,18 @@
+import { getAllVideos } from '../solutions/youtube/utils'
+import { callOllama } from '../lib/utils/ollama'
+import { iItem } from '../app/src/utils/types'
+import { writeFileSync } from 'fs'
+import express from 'express'
+import cors from 'cors'
+
 
 const PREDICTION_PROMPT = (youtubeVideo:string) => `
 YouTube channel performance analysis:
-The YouTube channel's content primarily focuses on innovation, technology, life lessons, media, and career topics presented in a knowledgeable, interesting, fascinating, skilled, informative, successful, and exploratory manner. This content is most likely to result in a good performance, with emotions such as hope and gratitude being particularly impactful. Additionally, incorporating actionable, numeric, versatile, entrepreneurial, and prosperous elements into the content could further boost its performance.
+The YouTube channel in question performs well when the content focuses on topics related to career, success, lifestyle, investing, and emotes feelings of hope, mystery, and aspiration. The content should be practical, versatile, persuasive, complex, and motivational to maximize performance.
 
-Conversely, content related to art, war, and religion may contribute to a poorer performance due to their association with surprise, awe, sadness emotions, perplexing, intense, unpredictable adjectives.
+Conversely, the channel's performance deteriorates when the content is about war, culture, writing, art, or other similar topics that evoke surprise, awe, intrigue, perplexity, intensity, unusualness, rawness, and psychological complexity.
 
-The median number of views for this channel is 324000, with the top quartile reaching 516000 views and the bottom quartile at 156000 views. This suggests that while the channel consistently generates a substantial audience, there is significant room for growth in viewership, particularly within the upper echelons of performance. To achieve this growth, the channel may want to focus on refining its content to better align with the emotions and topics associated with strong performance, while also finding ways to present its existing content in a more actionable, numeric, versatile, entrepreneurial, and prosperous manner.
+The median number of views for this channel is 324000, with the top quartile reaching 516000 views and the bottom quartile at 156000 views. 
 
 Instructions:
 Your task is to make a prediction on the number of views for a given YouTube video.
@@ -17,14 +24,9 @@ Do not provide a range for your prediction, either.
 YouTube video title:
 ${youtubeVideo}
 
-Prediction:
-`
+Prediction:`
 
 
-import { callOllama } from '../lib/utils/ollama'
-import { writeFileSync } from 'fs'
-import express from 'express'
-import cors from 'cors'
 
 const app = express()
 app.use(express.json())
@@ -45,15 +47,107 @@ app.post('/prediction', async({ body }, res) => {
     return res.send(response)
 })
 
-app.post('/writeFile', async({ body }, res) => {
+app.post('/write/predictions', async({ body }, res) => {
     // Get text from body:
     const { predictions } = body
 
     // Write to file:
     const jsonPredictions = JSON.stringify(predictions, null, 2)
-    writeFileSync('predictions.json', jsonPredictions)
+    writeFileSync('ignore/predictions.json', jsonPredictions)
+
+    res.send(200)
+})
+
+app.post('/write/clusters', async({ body }, res) => {
+    // Get text from body:
+    const { clusters } = body
+
+    // Write to file:
+    const jsonClusters = JSON.stringify(clusters, null, 2)
+    writeFileSync('ignore/clusters.json', jsonClusters)
+
+    res.send(200)
+})
+
+app.get('/videos/channel/:channel', async(req, res) => {
+    const { channel } = req.params
+
+    // Get all videos:
+    const videos = await getAllVideos()
+    const channelVideos = videos.filter(v => v.category === channel)
+    res.send(channelVideos)
+})
+
+app.post('/videos/channels', async(req, res) => {
+    const { channels }:{ channels:string[] } = req.body
+
+    // Get all videos:
+    const allVideos = await getAllVideos()
+    const channelVideos:iItem[][] = channels.map(channel => {
+        const videos = allVideos.filter(v => v.category === channel)
+        const sortedVideos = videos.sort((a, b) => b.output - a.output)
+        const topVideos = sortedVideos.slice(0, 10)
+        return topVideos
+    })
+    
+    res.send(channelVideos)
+})
+
+
+app.get('/videos/attributes/:attribute/description', async(req, res) => {
+    const { attribute } = req.params
+
+    // Get all videos:
+    const videos = await getAllVideos()
+    const sortedVideos = videos.sort((a, b) => 
+        b.labels.find(l => l.label === attribute)!.score 
+        - a.labels.find(l => l.label === attribute)!.score
+    )
+
+    const topVideos = sortedVideos.slice(0, 50)
+
+    res.send({ videos:topVideos })
+})
+
+const getAttributeMedian = (videos:iItem[], attribute:string) => {
+    const sortedVideos = videos.sort((a, b) => 
+        b.labels.find(l => l.label === attribute)!.score 
+        - a.labels.find(l => l.label === attribute)!.score
+    )
+
+    const topVideos = sortedVideos.slice(0, 50)
+    const attrMedian = topVideos.sort((a, b) => a.output - b.output)[Math.floor(topVideos.length / 2)].output
+
+    return attrMedian
+}
+
+app.get('/videos/attributes/:attribute/performance', async(req, res) => {
+    const { attribute } = req.params
+
+    // Get all videos:
+    const videos = await getAllVideos()
+    const sortedVideos = videos.sort((a, b) => b.output - a.output)
+    const median = sortedVideos.sort((a, b) => a.output - b.output)[Math.floor(videos.length / 2)].output
+    const attrMedian = getAttributeMedian(videos, attribute)
+
+    const topQuartile = sortedVideos.slice(0, Math.floor(sortedVideos.length / 4))
+    const bottomQuartile = sortedVideos.slice(Math.floor(sortedVideos.length * 3 / 4))
+
+    const sortedTopQuartile = topQuartile.sort((a, b) => 
+        b.labels.find(l => l.label === attribute)!.score
+        - a.labels.find(l => l.label === attribute)!.score
+    )
+
+    const sortedBottomQuartile = bottomQuartile.sort((a, b) => 
+        b.labels.find(l => l.label === attribute)!.score
+        - a.labels.find(l => l.label === attribute)!.score
+    ) // TODO: Create helper function to sort by attribute.
+
+    const topVideos = sortedTopQuartile.slice(0, 20)
+    const bottomVideos = sortedBottomQuartile.slice(sortedBottomQuartile.length - 20)
+
+    res.send({ topVideos, bottomVideos, median, attrMedian })
 })
 
 
 app.listen(port, () => console.log(`amVizion API running on port ${port}`))
-

@@ -1,0 +1,32 @@
+{
+  "name": "bi-llm-solutions",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "youtube": "npx ts-node youtube/index.ts",
+    "youtube-inference": "npx ts-node youtube/inference.ts",
+    "youtube-channels": "npx ts-node youtube/aggregation.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amVizion/BI-LLM.git"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "data"
+  ],
+  "author": "Santiago M.",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/amVizion/BI-LLM/issues"
+  },
+  "homepage": "https://github.com/amVizion/BI-LLM#readme",
+  "description": "",
+  "dependencies": {
+    "@googleapis/youtube": "^20.0.0",
+    "@types/node": "^22.7.1",
+    "gts": "^5.3.1"
+  }
+}

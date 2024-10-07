@@ -1,6 +1,7 @@
-import { iCluster, iClusterReport, iReportAnalysis } from "../../app/src/utils/types"
+import { iClusterReport, iReportAnalysis } from "../../app/src/utils/types"
 import { iResearchContext } from "./types"
 import { callOllama } from "./ollama" 
+import { iCluster } from "../pipelines/3.CDV"
 
 export const LABEL_PROMPT = ({itemName, purpose}: iResearchContext) => `
 Describe the following ${itemName} in 3 single-words.

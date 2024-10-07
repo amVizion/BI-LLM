@@ -1,14 +1,29 @@
 
-type tScore = { label:string, score:number }
-export type tAttribute = { 
-    label:string
-    average:number
-    prevalence:number | null
-    correlation:number
-    causality:number | null
+export type tScore = { label:string, score:number }
+
+export type tClusterAttrStats = {
+    label: string
+
+    mean: number
+    attrMean: number
+    deltaMean: number
+
+    rho: number
+    attrRho: number
+    deltaRho: number
+
+    sd: number
+    attrSd: number
+    deltaSd: number
+
+    prominence: number // attrMean * attrRho
+    clusterProminence: number // mean * rho
+    causality: number // deltaMean * attrRho
 }
 
 export interface iCorrelation { label:string, rho:number, mean:number, sd:number }
+
+
 export interface iClusterReport { 
     index: number
     name: string
@@ -40,14 +55,15 @@ export interface iCluster {
     description?: string
 
     size:number
+    rank:number
     color:string
     center:number[] 
     centroid:number[]
     avgOutput:number
-    attributes: tAttribute[]
+    attributes: tClusterAttrStats[]
 
     subClusters?: iCluster[]
-    verticalAttributes?: {[vertical:string]:tAttribute[]}
+    verticalAttributes?: {[vertical:string]:tClusterAttrStats[]}
 }
 
 export interface iItem { 
@@ -58,6 +74,7 @@ export interface iItem {
     prediction:number
     cluster:number
     center:number[]
+    category?:string
 }
 
 export interface iScatterData {
@@ -70,8 +87,14 @@ export interface iScatterData {
     fill:string
 }
 
+
+// Prominence is the mean times the correlation. How relevant is the attribute to the performance.
+export interface iFullCorrelation extends iCorrelation { prominence:number } 
+export type tVerticalCorrelations = {[vertical:string]:iFullCorrelation[]}
+
 export interface iVerticals {
     verticals: string[]
-    correlations: {[vertical:string]:number}
+    correlations: {[vertical:string]:number | null}
     labelCorrelations: {[vertical:string]:iCorrelation[]}
+    verticalCorrelations?: tVerticalCorrelations
 }

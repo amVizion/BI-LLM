@@ -36,7 +36,7 @@ export const NavBar = ({ setView }:iNavBar) => <nav
 						Clusters
 				</a>
 
-				<a className="navbar-item" onClick={() => setView(REPORT_VIEW)}>
+				<a className="navbar-item" onClick={() => setView(REPORT_VIEW)} style={{display:'none'}}>
 						Report
 				</a>
 			</div>

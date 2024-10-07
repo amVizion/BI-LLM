@@ -1,20 +1,34 @@
-import CORRELATIONS from '../data/correlations.json'
-import { iCluster, iItem } from "../utils/types"
-import { numberFormater } from "../utils/utils"
+import { iCluster, iItem, iCorrelation } from "../utils/types"
 import { CSSProperties, useEffect, useState } from "react"
+import { getTableColor, numberFormater } from "../utils/utils"
+import { iAction } from '../views/Items'
+import { Dropdown } from './PromptBox'
+
 import axios from "axios"
 
 
-const TABLE_HEADER_STYLE:CSSProperties = {color:'black', textAlign:'center', verticalAlign:'middle'}
-const API_URL = 'http://localhost:3000'
+const TABLE_HEADER_STYLE:CSSProperties = {
+    color:'black', 
+    textAlign:'center', 
+    verticalAlign:'middle'
+}
 
-interface iPrediction {items:iItem[], clusters?:iCluster[]}
-export const Predictions = ({items, clusters}:iPrediction) => {
+export const API_URL = 'http://localhost:3000'
+
+interface iPrediction {
+    items:iItem[]
+    clusters?:iCluster[]
+    correlations:iCorrelation[]
+    setAction:(action:iAction)=>void
+}
+
+export const Predictions = ({items, clusters, correlations, setAction}:iPrediction) => {
     const [predictions, setPredictions] = useState<iItem[]>(items)
+    const [type, setType] = useState<string>('SIMILAR')
 
     const makePrediction = async(item:iItem) => {
         try{
-            const url = `${API_URL}/prediction`
+            const url = `${API_URL}/write/predictions`
             const { data } = await axios.post(url, { text:item.text })
             const prediction = Number(data)
             if(isNaN(prediction)) throw new Error('Prediction is not a number')
@@ -48,15 +62,28 @@ export const Predictions = ({items, clusters}:iPrediction) => {
 <table className='table is-fullwidth'>
     <thead>
         <tr className={'is-light'}>
-            <th style={TABLE_HEADER_STYLE} colSpan={7}> 
+            <th style={TABLE_HEADER_STYLE} colSpan={clusters ? 7 : 6}> 
                 Predictions Table 
             </th>
             <th>
-            <button 
-            onClick={makePredictions}
-            className={`button is-info`} 
-        > Make Predictions </button>
+                <Dropdown text={'Actions'} color='is-info'>
+                    <a className="dropdown-item" onClick={() => setType('SIMILAR')}> Similarity </a>
+                    <a 
+                        className="dropdown-item" 
+                        onClick={() => setType('CHANNEL_DESC')}
+                    > Describe channel </a>
+                    <a 
+                        className="dropdown-item"
+                        onClick={() => setType('CHANNEL_PERF')}
+                    > Channel performance </a>
+                </Dropdown>
+            </th>
 
+            <th>
+                <button 
+                    onClick={makePredictions}
+                    className={`button is-link`} 
+                > Make Predictions </button>
             </th>
         </tr>
 
@@ -78,24 +105,28 @@ export const Predictions = ({items, clusters}:iPrediction) => {
         .map((f, i) => {
 
             const sortedLabels = f.labels.sort((a, b) => 
-                (a.score - CORRELATIONS.find(({label}) => a.label === label)!.mean) > 
-                (b.score - CORRELATIONS.find(({label}) => b.label === label)!.mean)
-                ? -1 : 1
+                Math.abs(a.score * correlations.find(({label}) => a.label === label)!.rho) > 
+                Math.abs(b.score * correlations.find(({label}) => b.label === label)!.rho)
+                    ? -1 : 1
             )
             return <tr key={i}>
-                <td style={{maxWidth:360}}> {f.text} </td>
+                <td 
+                    style={{maxWidth:360, cursor:'pointer'}} 
+                    onClick={() => setAction({type, value:f, async: type !== 'SIMILAR'})}
+                > {f.text} </td>
                 <td style={{textAlign:'center'}}> {numberFormater(f.output)} </td>
                 <td style={{textAlign:'center'}}> {numberFormater(f.prediction)} </td>
-                { clusters && <td> {clusters[f.cluster].name} </td> }
+                { clusters && <td> {clusters[f.cluster].name || clusters[f.cluster].index } </td> }
 
-                { [...Array(5)].map((_, i) => <td> 
-                    { sortedLabels[i].label } ( 
-                        {Math.round(sortedLabels[i].score)}/ 
-                        {Math.round(CORRELATIONS.find(({label}) => sortedLabels[i].label === label)!.mean)}
-                    )
-                </td>)}
+                { [...Array(5)].map((_, i) => 
+                    <td 
+                        onClick={() => setAction({ type:'ATTRIBUTE', value:sortedLabels[i].label })}
+                        style={{ cursor:'pointer', color: getTableColor(sortedLabels[i], correlations) }}
+                    >  { sortedLabels[i].label } ({Math.round(sortedLabels[i].score)}) </td>
+                )}
             </tr>
         })}
     </tbody>
 </table>
-</div>}
+</div>
+}
