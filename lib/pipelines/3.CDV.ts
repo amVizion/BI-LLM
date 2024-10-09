@@ -330,19 +330,28 @@ interface iVisualizeInput {
 }
 
 const write = async(input:iVisualizeInput, config:iConfig) => {
-    const { correlations, clusters, texts, report, verticalCorrelations={} } = input
+    const { correlations, clusters, texts, report, verticalCorrelations } = input
     const dir = config.outputPath || '../app/src/data'
 
     await writeFile(`${dir}/data.json`, JSON.stringify(texts, null, 4))
     await writeFile(`${dir}/correlations.json`, JSON.stringify(correlations, null, 4))
     await writeFile(`${dir}/verticals.json`, JSON.stringify(verticalCorrelations, null, 4))    
 
-    if(!clusters || ! report) return
+    if(!clusters || ! report) return { 
+        texts, 
+        correlations, 
+        verticalCorrelations: verticalCorrelations?.labelCorrelations!
+    }
+
 
     await writeFile(`${dir}/report.json`, JSON.stringify(report, null, 4))
     await writeFile(`${dir}/clusters.json`, JSON.stringify(clusters, null, 4))
 
-    return
+    return { 
+        texts, 
+        correlations, 
+        verticalCorrelations: verticalCorrelations?.labelCorrelations!
+    }
 }
 
 export const cdvPipeline = async(texts:iClusteredText[], rawClusters:iRawCluster[], config:iConfig) => {

@@ -76,12 +76,12 @@ export const Items = ({ items, verticals, verticalCorrelations, correlations }:i
         }
 
         const prompt = {
-            INTRO: () => getIntroductionPrompt(verticalCorrelations, items),
-            TOP_ATTRS: () => getTopAttributesPrompt(verticalCorrelations, items),
-            WORST_ATTRS: () => getWorstAttributesPrompt(verticalCorrelations, items),
+            INTRO: () => getIntroductionPrompt(correlations, items),
+            TOP_ATTRS: () => getTopAttributesPrompt(correlations, items),
+            WORST_ATTRS: () => getWorstAttributesPrompt(correlations, items),
             SUMMARY: () => getSummaryPrompt(items),
             ANALYSIS: () => getAnalysisPrompt(items),
-            VERTICAL: () => getVerticalPrompt(value!  as string, verticalCorrelations),
+            VERTICAL: () => getVerticalPrompt(value!  as string, verticalCorrelations[value! as string]),
             TOP_VIDEOS: () => getTopVideosPrompt(items),
             WORST_VIDEOS: () => getWorstVideosPrompt(items),
             ATTRIBUTE:() => getAttributePrompt(value! as string, items),

@@ -1,6 +1,7 @@
 import { iCluster, iItem, iCorrelation } from "../utils/types"
 import { CSSProperties, useEffect, useState } from "react"
 import { getTableColor, numberFormater } from "../utils/utils"
+import { API_URL } from "../utils/prompts"
 import { iAction } from '../views/Items'
 import { Dropdown } from './PromptBox'
 
@@ -13,7 +14,6 @@ const TABLE_HEADER_STYLE:CSSProperties = {
     verticalAlign:'middle'
 }
 
-export const API_URL = 'http://localhost:3000'
 
 interface iPrediction {
     items:iItem[]

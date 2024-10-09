@@ -21,7 +21,9 @@ export const analysis = async(texts:iInputText[], outputPath:string) => {
     const scoredTexts = await predictScores(reducedEmbeddings, config)
 
     const { clusteredTexts, clusters } = await clusterTexts(scoredTexts, config)
-    await cdvPipeline(clusteredTexts, clusters, config)
+    const result = await cdvPipeline(clusteredTexts, clusters, config)
+
+    return result
 }
 
 export const embeddedAnalysis = async(embeddedTexts:iEmbeddedText[], outputPath:string) => {
