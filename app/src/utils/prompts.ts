@@ -1,17 +1,20 @@
 import { iFullCorrelation, tVerticalCorrelations, iItem, iCluster, iCorrelation, tScore } from './types'
 import { kMeansCluster } from 'simple-statistics'
 import data from '../data/data.json'
-import { API_URL } from '../components/Predictions'
 import axios from 'axios'
+
+export const API_URL = 'http://localhost:3000'
 
 type tStat = 'rho' | 'mean' | 'sd' | 'prominence'
 
-const getQuartile = (data:number[]) => {
+export const getQuartiles = (data:number[]) => {
     const sorted = data.sort((a, b) => a - b)
-    const q1 = sorted[Math.floor(sorted.length / 4)]
-    const q2 = sorted[Math.floor(sorted.length / 2)]
-    const q3 = sorted[Math.floor(sorted.length * 3 / 4)]
-    return { q1, q2, q3 }
+    const q1 = sorted[Math.floor(sorted.length * 3 / 4)]
+    const median = sorted[Math.floor(sorted.length / 2)]
+    const q3 = sorted[Math.floor(sorted.length / 4)]
+    const min = sorted[0]
+    const max = sorted[sorted.length - 1]
+    return { max, q1, median, q3, min }
 }
 
 
@@ -33,8 +36,8 @@ export const getReport = (verticalCorrelations:tVerticalCorrelations) => {
     const decorrelationInput = {sortKey:'prominence' as const, inverse:true, correlations:verticalCorrelations}
     const decorrelation = orderAttributes(decorrelationInput)
 
-    const outputs = data.map(({ output }) => output)
-    const { q1, q2, q3 } = getQuartile(outputs)
+    const outputs = (data as iItem[]).map(({ output }) => output)
+    const { q1, median, q3 } = getQuartiles(outputs)
 
     return `Generate a brief analysis of the performance of a YouTube channel.
 
@@ -53,17 +56,18 @@ While the attributes that contribute the most to a bad performance are:
 - Topics: ${decorrelation['topics'].filter((_, i) => i < 4).map(({ label }) => label).join(', ')}
 - Adjectives: ${decorrelation['adjectives'].filter((_, i) => i < 5).map(({ label }) => label).join(', ')}
 
-The median number of views is ${q2}. 
+The median number of views is ${median}. 
 While the top quartile is at ${q3} and the bottom quartile at ${q1} views.`
 }
 
 const instructionsPrompt = (task:string) => `You are a data analyst studying the performance of a YouTube channel.
-Your task is to write a paragraph that ${task}
-Use a casual language, simplifying the informaton for the Social Media Manager.`
+Your task is to write a paragraph that ${task}.
+`
 
 // Top attributes by mean score. Plus sample titles at the center of clusters.
-export const getIntroductionPrompt = (verticalCorrelations:tVerticalCorrelations, texts:iItem[]) => {
-    const attributes = orderAttributes({sortKey: 'mean', correlations: verticalCorrelations})
+export const getIntroductionPrompt = (correlations:iCorrelation[], texts:iItem[]) => {
+    const attrs = correlations.sort((a, b) => b.mean - a.mean).slice(0, 10)
+
     const embeddings = texts.map(({ embeddings }) => embeddings)
     console.log('embeddings', embeddings)
 
@@ -81,21 +85,19 @@ export const getIntroductionPrompt = (verticalCorrelations:tVerticalCorrelations
     const task = "describes the channel's content."
     return `${instructionsPrompt(task)}
 
+Main attributes:
+${attrs.map(({ label }) => `${label}`).join(', ')}
+
 Sample titles:
 ${closestTexts.map(t => `- ${t}`).join('\n')}
-
-Main attributes:
-- Emotions: ${attributes['emotions'].filter((_, i) => i < 3).map(({ label }) => label).join(', ')}
-- Topics: ${attributes['topics'].filter((_, i) => i < 5).map(({ label }) => label).join(', ')}
-- Adjectives: ${attributes['adjectives'].filter((_, i) => i < 7).map(({ label }) => label).join(', ')}
-
 
 Introduction:
 The YouTube channel content is about`
 }
 
-export const getTopAttributesPrompt = (verticalCorrelations:tVerticalCorrelations, texts:iItem[]) => { 
-    const correlation = orderAttributes({sortKey: 'prominence', correlations: verticalCorrelations})
+export const getTopAttributesPrompt = (correlations:iCorrelation[], texts:iItem[]) => { 
+    const prominence = correlations.map(({ mean, rho, label }) => ({ label, prominence:mean * rho }))
+    const sortedAttrs = prominence.sort((a, b) => b.prominence - a.prominence).slice(0, 10)
 
     // Get top 5 texts by output.
     const topTexts = texts.sort((a, b) => b.output - a.output).map(({ text }) => text).slice(0, 5)
@@ -105,18 +107,16 @@ export const getTopAttributesPrompt = (verticalCorrelations:tVerticalCorrelation
     return `${instructionsPrompt(task)}
 
 Top performing attributes:
-- Emotions: ${correlation['emotions'].filter((_, i) => i < 3).map(({ label }) => label).join(', ')}
-- Topics: ${correlation['topics'].filter((_, i) => i < 4).map(({ label }) => label).join(', ')}
-- Adjectives: ${correlation['adjectives'].filter((_, i) => i < 5).map(({ label }) => label).join(', ')}
+${sortedAttrs.map(({ label }) => `${label}`).join(', ')}
 
 Top videos:
 ${topTexts.map(t => `- ${t}`).join('\n')}
 ` 
 }
 
-export const getWorstAttributesPrompt = (verticalCorrelations:tVerticalCorrelations, texts:iItem[]) => {
-    const decorrelationInput = {sortKey:'prominence' as const, inverse:true, correlations:verticalCorrelations}
-    const decorrelation = orderAttributes(decorrelationInput)
+export const getWorstAttributesPrompt = (correlations:iCorrelation[], texts:iItem[]) => {
+    const prominence = correlations.map(({ mean, rho, label }) => ({ label, prominence:mean * rho }))
+    const sortedAttrs = prominence.sort((a, b) => a.prominence - b.prominence).slice(0, 10)
 
     // Get worst 5 texts by output.
     const worstTexts = texts.sort((a, b) => a.output - b.output).map(({ text }) => text).slice(0, 5)
@@ -126,9 +126,7 @@ export const getWorstAttributesPrompt = (verticalCorrelations:tVerticalCorrelati
     return `${instructionsPrompt(task)}
 
 Worst performing attributes:
-- Emotions: ${decorrelation['emotions'].filter((_, i) => i < 3).map(({ label }) => label).join(', ')}
-- Topics: ${decorrelation['topics'].filter((_, i) => i < 5).map(({ label }) => label).join(', ')}
-- Adjectives: ${decorrelation['adjectives'].filter((_, i) => i < 7).map(({ label }) => label).join(', ')}
+${sortedAttrs.map(({ label }) => `${label}`).join(', ')}
 
 Worst videos:
 ${worstTexts.map(t => `- ${t}`).join('\n')}
@@ -161,25 +159,21 @@ ${sortedTexts.map(({ text, output }) => `- ${text}: ${output} views`).join('\n')
 `}
 
 
-export const getVerticalPrompt = (vertical:string, correlations:tVerticalCorrelations) => {
+export const getVerticalPrompt = (vertical:string, correlations:iCorrelation[]) => {
     // For the given vertical select the top attributes by mean, and prominence.
-    const attributes = orderAttributes({sortKey: 'mean', correlations})
-    const correlation = orderAttributes({sortKey: 'prominence', correlations})
-    const decorrelationInput = {sortKey:'prominence' as const, inverse:true, correlations}
-    const decorrelation = orderAttributes(decorrelationInput)
-
-    const verticalAttributes = attributes[vertical]
-    const verticalCorrelation = correlation[vertical]
-    const verticalDecorrelation = decorrelation[vertical]
+    const attrs = correlations.sort((a, b) => b.mean - a.mean).slice(0, 10)
+    const prominence = correlations.map(({ mean, rho, label }) => ({ label, prominence:mean * rho }))
+    const topAttrs = prominence.sort((a, b) => b.prominence - a.prominence).slice(0, 10)
+    const worstAttrs = prominence.sort((a, b) => a.prominence - b.prominence).slice(0, 10)
 
     const task = `describes the content of the ${vertical} that drive engagement.`
 
     const quantity = {emotions: 3, topics:5, adjectives:7 }[vertical] || 5
     return `${instructionsPrompt(task)}
 
-Most common ${vertical}: ${verticalAttributes.filter((_, i) => i < quantity).map(({ label }) => label).join(', ')}
-Top performing ${vertical}: ${verticalCorrelation.filter((_, i) => i < quantity).map(({ label }) => label).join(', ')}
-Worst performing ${vertical}: ${verticalDecorrelation.filter((_, i) => i < quantity).map(({ label }) => label).join(', ')}
+Most common ${vertical}: ${attrs.filter((_, i) => i < quantity).map(({ label }) => label).join(', ')}
+Top performing ${vertical}: ${topAttrs.filter((_, i) => i < quantity).map(({ label }) => label).join(', ')}
+Worst performing ${vertical}: ${worstAttrs.filter((_, i) => i < quantity).map(({ label }) => label).join(', ')}
 
 Don't simply list the attributes, create a coherent narrative that creates understanding about the performance.
 `}
@@ -194,10 +188,10 @@ export const getAttributePrompt = (attribute:string, texts:iItem[]) => {
     }).slice(0, 10)
 
     // Get the median value of texts by output.
-    const { q2 } = getQuartile(texts.map(({ output }) => output))
+    const { median } = getQuartiles(texts.map(({ output }) => output))
 
-    const aboveMedian = attributeTexts.filter(({ output }) => output > q2)
-    const belowMedian = attributeTexts.filter(({ output }) => output <= q2)
+    const aboveMedian = attributeTexts.filter(({ output }) => output > median)
+    const belowMedian = attributeTexts.filter(({ output }) => output <= median)
 
     const task = `explains how ${attribute} drives the performance of the channel.`
     return `${instructionsPrompt(task)}
@@ -206,7 +200,7 @@ Analyze how ${attribute} affects the performance of the channel.
 Consider whether videos with this attribute tend to perform above or below the median. 
 Based on the provided titles, identify which other attributes contribute to a good or bad performance.
 
-Videos above the median (${q2}):
+Videos above the median (${median}):
 ${aboveMedian.map(({ text }) => `- ${text}`).join('\n')}
 
 Videos below the median:
@@ -231,7 +225,7 @@ export const getSimilarityPrompt = (text:iItem, texts:iItem[]) => {
     const belowPerformance = closestTexts.filter(({ output }) => output <= text.output)
 
     const task = `explains the performance of a video related to similar videos.`
-    const { q2 } = getQuartile(texts.map(({ output }) => output))
+    const { median } = getQuartiles(texts.map(({ output }) => output))
 
     return `${instructionsPrompt(task)}
 
@@ -248,7 +242,7 @@ Your decision will determine if the channel should continue publishing similar v
 And if so, how to optimize those videos to improve performance.
 Else, what other types of videos should be considered.
 
-The video had ${text.output} views, while the channel's median is ${q2} views.
+The video had ${text.output} views, while the channel's median is ${median} views.
 `
 }
 
@@ -488,7 +482,7 @@ Remember, as a data analyst, your job is to find the truth not be nice.
 `}
 
 export const attributeTopChannels = async(attribute:string, items:iItem[], correlations:iCorrelation[]) => {
-    const sortedChannels = items.sort((a, b) =>  b.output - a.output)
+    const sortedChannels = [...items].sort((a, b) =>  b.output - a.output)
     const topQuartileChannels = sortedChannels.slice(0, Math.floor(sortedChannels.length / 4))
 
     const channels = topQuartileChannels.sort((a, b) => {

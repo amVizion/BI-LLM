@@ -5,6 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "bi-llm": "npx ts-node index.ts",
+    "reflexion": "npx ts-node reflexion",
     "test": "test.ts"
   },
   "author": "Santiago M.",

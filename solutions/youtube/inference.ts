@@ -40,4 +40,4 @@ const getChannels = async() => {
     return channels
 }
 
-getChannels().catch(console.error)
+// getChannels().catch(console.error)

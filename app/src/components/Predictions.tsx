@@ -1,6 +1,7 @@
 import { iCluster, iItem, iCorrelation } from "../utils/types"
 import { CSSProperties, useEffect, useState } from "react"
 import { getTableColor, numberFormater } from "../utils/utils"
+import { API_URL } from "../utils/prompts"
 import { iAction } from '../views/Items'
 import { Dropdown } from './PromptBox'
 
@@ -13,7 +14,6 @@ const TABLE_HEADER_STYLE:CSSProperties = {
     verticalAlign:'middle'
 }
 
-export const API_URL = 'http://localhost:3000'
 
 interface iPrediction {
     items:iItem[]
@@ -62,7 +62,7 @@ export const Predictions = ({items, clusters, correlations, setAction}:iPredicti
 <table className='table is-fullwidth'>
     <thead>
         <tr className={'is-light'}>
-            <th style={TABLE_HEADER_STYLE} colSpan={clusters ? 7 : 6}> 
+            <th style={TABLE_HEADER_STYLE} colSpan={clusters ? 6 : 5}> 
                 Predictions Table 
             </th>
             <th>
@@ -79,7 +79,7 @@ export const Predictions = ({items, clusters, correlations, setAction}:iPredicti
                 </Dropdown>
             </th>
 
-            <th>
+            <th colSpan={2} style={{textAlign:'center'}}>
                 <button 
                     onClick={makePredictions}
                     className={`button is-link`} 
