@@ -22,7 +22,10 @@
 
 */
 
-import { iItem } from "../../app/src/utils/types";
+import { iItem } from "../../app/src/utils/types"
+import { makePredictions } from "./predictions"
+import { getQuartiles } from "../../app/src/utils/prompts"
+import { writeFileSync } from "fs"
 
 const getAccuracyMetrics = (predictions:iItem[]) => {
     const MLE = predictions.reduce((acc, { output, prediction }) => {
@@ -37,47 +40,41 @@ const getAccuracyMetrics = (predictions:iItem[]) => {
         const meanX = x.reduce((acc, val) => acc + val, 0) / x.length
         const meanY = y.reduce((acc, val) => acc + val, 0) / y.length
 
-        const numerator = x.reduce((acc, val, idx) => acc + (val - meanX) * (y[idx] - meanY), 0);
-        const denominatorX = Math.sqrt(x.reduce((acc, val) => acc + Math.pow(val - meanX, 2), 0));
-        const denominatorY = Math.sqrt(y.reduce((acc, val) => acc + Math.pow(val - meanY, 2), 0));
+        const numerator = x.reduce((acc, val, idx) => acc + (val - meanX) * (y[idx] - meanY), 0)
+        const denominatorX = Math.sqrt(x.reduce((acc, val) => acc + Math.pow(val - meanX, 2), 0))
+        const denominatorY = Math.sqrt(y.reduce((acc, val) => acc + Math.pow(val - meanY, 2), 0))
 
-        const correlation = numerator / (denominatorX * denominatorY);
+        const correlation = numerator / (denominatorX * denominatorY)
         return correlation
     }
 
     const correlation = getCorrelation(predictions)
 
     const getRanking = (predictions:iItem[]) => {
-        const sortedPredictions = predictions.slice().sort((a, b) => a.prediction - b.prediction);
-        const sortedOutputs = predictions.slice().sort((a, b) => a.output - b.output);
+        const sortedPredictions = predictions.slice().sort((a, b) => a.prediction - b.prediction)
+        const sortedOutputs = predictions.slice().sort((a, b) => a.output - b.output)
 
         const rankingDiffs = sortedPredictions.map((pred, idx) => {
-            const outputIdx = sortedOutputs.findIndex(output => output.output === pred.output);
-            return Math.abs(idx - outputIdx);
-        });
+            const outputIdx = sortedOutputs.findIndex(output => output.output === pred.output)
+            return Math.abs(idx - outputIdx)
+        })
 
-        const ranking = rankingDiffs.reduce((acc, diff) => acc + diff, 0) / predictions.length;
-        return ranking;
+        const ranking = rankingDiffs.reduce((acc, diff) => acc + diff, 0) / predictions.length
+        return ranking
     }
 
     const ranking = getRanking(predictions)
     return { MLE, correlation, ranking }
 }
 
-export interface iQuartiles { q1:number, median:number, q3:number }
+export interface iQuartiles { q1:number, median:number, q3:number, max:number, min:number }
 const getNeutralityMetrics = (predictions:iItem[], quartiles:iQuartiles) => {
     const getMedianBalance = (predictions:iItem[], median:number) => {
         const aboveMedian = predictions.filter(({ prediction }) => prediction > median).length
-        const belowMedian = predictions.filter(({ prediction }) => prediction < median).length
-        const predictionsRatio = aboveMedian / belowMedian
-
         const outputsAboveMedian = predictions.filter(({ output }) => output > median).length
-        const outputsBelowMedian = predictions.filter(({ output }) => output < median).length
 
-        const outputsRatio = outputsAboveMedian/outputsBelowMedian
-        const balance = predictionsRatio - outputsRatio 
-
-        return balance // If positive, model is optimistic. If negative, model is pessimistic.
+        const balance = aboveMedian/outputsAboveMedian
+        return balance // If above one: the model is optimistic. Else, model is pessimistic.
     }
 
     const medianBalance = getMedianBalance(predictions, quartiles.median)
@@ -89,17 +86,19 @@ const getNeutralityMetrics = (predictions:iItem[], quartiles:iQuartiles) => {
         const outputsQ1 = predictions.filter(({ output }) => output < quartiles.q1).length
         const outputsQ3 = predictions.filter(({ output }) => output > quartiles.q3).length
 
-        const predictionsRatio = predictionsQ1 / predictionsQ3
-        const outputsRatio = outputsQ1 / outputsQ3
+        const predictionDifference = predictionsQ1 - predictionsQ3
+        const outputDifference = outputsQ1 - outputsQ3
 
-        const balance = predictionsRatio - outputsRatio
+        const numerator = predictionDifference - outputDifference
+        const balance = numerator / predictions.length
+
         return balance // If positive, model is optimistic. If negative, model is pessimistic.
     }
     
     const quartileBalance = getQuartileBalance(predictions, quartiles)
 
     return { medianBalance, quartileBalance }
-}
+} // TODO: Consider max & top5 metrics.
 
 const getAnomalyDetectionMetrics = (predictions:iItem[], quartiles:iQuartiles) => {
     const getQuartileDetection = (predictions:iItem[], quartiles:iQuartiles) => {
@@ -123,10 +122,13 @@ const getAnomalyDetectionMetrics = (predictions:iItem[], quartiles:iQuartiles) =
         const outputsMax = Math.max(...predictions.map(({ output }) => output))
         const outputsMin = Math.min(...predictions.map(({ output }) => output))
 
-        const maxDistance = Math.abs(max - outputsMax)/outputsMax
-        const minDistance = Math.abs(min - outputsMin)/outputsMin
+        const maxDistance = max/outputsMax
+        const minDistance = outputsMin/min
 
-        return { maxDistance, minDistance } // The smaller, the better.
+        const ratio = (maxDistance + minDistance)/2
+
+        // How far are predictions from the maximum and minimum values.
+        return ratio // The smaller the better.
     } // TODO: Implement similar for neutrality.
 
     const getTopViews = (predictions:iItem[]) => {
@@ -136,24 +138,135 @@ const getAnomalyDetectionMetrics = (predictions:iItem[], quartiles:iQuartiles) =
         const top5Predictions = predictions.slice(0, 5).reduce((acc, { prediction }) => acc + prediction, 0) / 5
         const bottom5Predictions = predictions.slice(-5).reduce((acc, { prediction }) => acc + prediction, 0) / 5
 
-        const topAccuracy = Math.abs(top5Views - top5Predictions)/top5Views
-        const bottomAccuracy = Math.abs(bottom5Views - bottom5Predictions)/bottom5Views
+        const topAccuracy = top5Views/top5Predictions
+        const bottomAccuracy = bottom5Predictions/bottom5Views
 
-        return { topAccuracy, bottomAccuracy }
-    }
+        const ratio = (topAccuracy + bottomAccuracy)/2
+        return ratio
+    } // The smaller the better.
 
     const quartileDetection = getQuartileDetection(predictions, quartiles)
-    const maxMinDistance = getMaxMinDistance(predictions)
-    const topBottom5MeanViews = getTopViews(predictions)
+    const maxDistance = getMaxMinDistance(predictions)
+    const topFiveDistance = getTopViews(predictions)
 
-    return { quartileDetection, ...maxMinDistance, ...topBottom5MeanViews }
+    return { quartileDetection, maxDistance, topFiveDistance }
 }
 
-export const evaluatePredictions = (predictions:iItem[], quartiles:iQuartiles) => {
+interface iEvaluationMetrics {
+    accuracy: {
+        MLE: number
+        correlation: number
+        ranking: number
+    }
+
+    neutrality: {
+        medianBalance: number
+        quartileBalance: number
+    }
+
+    anomalyDetection: {
+        quartileDetection: number
+        maxDistance: number
+        topFiveDistance: number
+    }
+}
+
+export const evaluatePredictions = (predictions:iItem[], quartiles:iQuartiles, fileName:string) => {
     const accuracy = getAccuracyMetrics(predictions)
     const neutrality = getNeutralityMetrics(predictions, quartiles)
     const anomalyDetection = getAnomalyDetectionMetrics(predictions, quartiles)
 
+    const evaluation = { accuracy, neutrality, anomalyDetection }
+    writeFileSync(`${fileName}.json`, JSON.stringify(evaluation, null, 2))
+
     // TODO: Implement consistency metrics.
-    return { accuracy, neutrality, anomalyDetection }
+    return evaluation
+}
+
+
+export const compareReports = async(items:iItem[], report:string, reflexion:string, dir:string) => {
+    const quartiles =  getQuartiles(items.map(({ output }) => output))
+    const sampleItems = [...items].sort(() => Math.random() - 0.5).slice(0, 100)
+
+    const reportPredictions = await makePredictions(sampleItems, report, quartiles, `${dir}/reportPredictions`)
+    const newPredictions = await makePredictions(sampleItems, reflexion, quartiles, `${dir}/reflexionPredictions`)
+
+    const evaluateReport = evaluatePredictions(reportPredictions, quartiles, `${dir}/reportEvaluation.json`)
+    const evaluateReflexion = evaluatePredictions(newPredictions, quartiles, `${dir}/reflexionEvaluation.json`)
+
+    const compareAccuracy = (evaluateReport:iEvaluationMetrics, evaluateReflexion:iEvaluationMetrics) => {
+        const reportAccuracy = evaluateReport.accuracy
+        const reflexionAccuracy = evaluateReflexion.accuracy
+
+        let reportScore = 0
+
+        // If MLE is lower, reportScore increases.
+        reportAccuracy.MLE < reflexionAccuracy.MLE ? reportScore++ : reportScore--
+
+        // If correlation is higher, reportScore increases.
+        reportAccuracy.correlation > reflexionAccuracy.correlation ? reportScore++ : reportScore--
+
+        // If ranking is higher, reportScore increases.
+        reportAccuracy.ranking > reflexionAccuracy.ranking ? reportScore++ : reportScore--
+
+        return reportScore
+    }
+
+    const accuracyScore = compareAccuracy(evaluateReport, evaluateReflexion)
+    if(accuracyScore > 0) return report
+
+    const compareNeutrality = (evaluateReport:iEvaluationMetrics, evaluateReflexion:iEvaluationMetrics) => {
+        const reportNeutrality = evaluateReport.neutrality
+        const reflexionNeutrality = evaluateReflexion.neutrality
+        
+        // The closer the median balance to one the better
+        const medianDiff = Math.abs(1 - reportNeutrality.medianBalance)
+        const reflexionMedianDiff = Math.abs(1 - reflexionNeutrality.medianBalance)
+
+        // The closer the quartile balance to zero the better
+        const quartileDiff = Math.abs(reportNeutrality.quartileBalance)
+        const reflexionQuartileDiff = Math.abs(reflexionNeutrality.quartileBalance)
+
+        // The smaller the diff the better
+        const reportDiff = medianDiff + quartileDiff
+        const reflexionDiff = reflexionMedianDiff + reflexionQuartileDiff
+
+        // If negative report is better, if positive reflexion is better
+        const diff = reportDiff - reflexionDiff
+        return diff
+    }
+
+    const neutralityScore = compareNeutrality(evaluateReport, evaluateReflexion)
+    // If neutralityScore is positive. Reflexion is better.
+    if(neutralityScore > 0) return reflexion
+
+    const compareAnomalyDetection = (evaluateReport:iEvaluationMetrics, evaluateReflexion:iEvaluationMetrics) => {
+        const reportAnomalyDetection = evaluateReport.anomalyDetection
+        const reflexionAnomalyDetection = evaluateReflexion.anomalyDetection
+
+        let reportScore = 0
+
+        // The closer the quartile detection to zero the better
+        const quartileDiff = Math.abs(reportAnomalyDetection.quartileDetection)
+        const reflexionQuartileDiff = Math.abs(reflexionAnomalyDetection.quartileDetection)
+        quartileDiff < reflexionQuartileDiff ? reportScore++ : reportScore--
+
+        // The smaller the max distance to zero the better
+        const maxDiff = Math.abs(reportAnomalyDetection.maxDistance)
+        const reflexionMaxDiff = Math.abs(reflexionAnomalyDetection.maxDistance)
+        maxDiff < reflexionMaxDiff ? reportScore++ : reportScore--
+
+        // The smaller the top five distance to zero the better
+        const topDiff = Math.abs(reportAnomalyDetection.topFiveDistance)
+        const reflexionTopDiff = Math.abs(reflexionAnomalyDetection.topFiveDistance)
+        topDiff < reflexionTopDiff ? reportScore++ : reportScore--
+
+        return reportScore // If positive, report is better. If negative, reflexion is better.
+    }
+
+    const anomalyDetectionScore = compareAnomalyDetection(evaluateReport, evaluateReflexion)
+    if(anomalyDetectionScore > 0) return report
+
+    writeFileSync(`${dir}/winner.txt`, anomalyDetectionScore > 0 ? 'report' : 'reflexion')
+    return reflexion
 }

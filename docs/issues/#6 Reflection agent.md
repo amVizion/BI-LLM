@@ -20,11 +20,21 @@ The final outcome is a second version of the marketable report. Just as the firs
 
 - [x] Retrieve shorts content from API (expand to last 200 videos).
 - [x] Automate report generation, and predictions.
-- [ ] Evaluation of predictions across 4 accuracy metrics.
-- [ ] Reflection: propose questions to improve accuracy.
+- [x] Evaluation of predictions across 4 accuracy metrics.
+- [x] Reflection: propose questions to improve accuracy.
 - [ ] Data retrieval: map questions to LLM prompts.
 - [ ] Summary & consolidation: improve report based on answers.
 - [ ] Engagement questions: compare engagement across channels.
 - [ ] PromptStore: database to store LLM outputs.
 - [ ] Enable self-prompting, or even self-data retrieval by Reflection. 
 - [ ] Final output: marketable report for 20VC channel on short content.
+
+
+![image](../static/Reflexion.png)
+
+### Reflexion pipeline
+
+1. Test the new report.
+2. Evaluate the accuracy.
+3. Decide to use the new report or not.
+4. Go next cycle.

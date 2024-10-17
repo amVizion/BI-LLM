@@ -75,7 +75,7 @@ const App = () => {
 						verticals={clusterVerticals.verticals}
 						verticalCorrelations={verticalCorrelations.verticalCorrelations}
 						correlations={labels}
-						items={items}
+						items={items as iItem[]}
 					/> 
 				}
 			</div>

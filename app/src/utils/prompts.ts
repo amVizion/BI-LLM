@@ -7,12 +7,14 @@ export const API_URL = 'http://localhost:3000'
 
 type tStat = 'rho' | 'mean' | 'sd' | 'prominence'
 
-export const getQuartile = (data:number[]) => {
+export const getQuartiles = (data:number[]) => {
     const sorted = data.sort((a, b) => a - b)
-    const q1 = sorted[Math.floor(sorted.length / 4)]
-    const q2 = sorted[Math.floor(sorted.length / 2)]
-    const q3 = sorted[Math.floor(sorted.length * 3 / 4)]
-    return { q1, q2, q3 }
+    const q1 = sorted[Math.floor(sorted.length * 3 / 4)]
+    const median = sorted[Math.floor(sorted.length / 2)]
+    const q3 = sorted[Math.floor(sorted.length / 4)]
+    const min = sorted[0]
+    const max = sorted[sorted.length - 1]
+    return { max, q1, median, q3, min }
 }
 
 
@@ -34,8 +36,8 @@ export const getReport = (verticalCorrelations:tVerticalCorrelations) => {
     const decorrelationInput = {sortKey:'prominence' as const, inverse:true, correlations:verticalCorrelations}
     const decorrelation = orderAttributes(decorrelationInput)
 
-    const outputs = data.map(({ output }) => output)
-    const { q1, q2, q3 } = getQuartile(outputs)
+    const outputs = (data as iItem[]).map(({ output }) => output)
+    const { q1, median, q3 } = getQuartiles(outputs)
 
     return `Generate a brief analysis of the performance of a YouTube channel.
 
@@ -54,7 +56,7 @@ While the attributes that contribute the most to a bad performance are:
 - Topics: ${decorrelation['topics'].filter((_, i) => i < 4).map(({ label }) => label).join(', ')}
 - Adjectives: ${decorrelation['adjectives'].filter((_, i) => i < 5).map(({ label }) => label).join(', ')}
 
-The median number of views is ${q2}. 
+The median number of views is ${median}. 
 While the top quartile is at ${q3} and the bottom quartile at ${q1} views.`
 }
 
@@ -186,10 +188,10 @@ export const getAttributePrompt = (attribute:string, texts:iItem[]) => {
     }).slice(0, 10)
 
     // Get the median value of texts by output.
-    const { q2 } = getQuartile(texts.map(({ output }) => output))
+    const { median } = getQuartiles(texts.map(({ output }) => output))
 
-    const aboveMedian = attributeTexts.filter(({ output }) => output > q2)
-    const belowMedian = attributeTexts.filter(({ output }) => output <= q2)
+    const aboveMedian = attributeTexts.filter(({ output }) => output > median)
+    const belowMedian = attributeTexts.filter(({ output }) => output <= median)
 
     const task = `explains how ${attribute} drives the performance of the channel.`
     return `${instructionsPrompt(task)}
@@ -198,7 +200,7 @@ Analyze how ${attribute} affects the performance of the channel.
 Consider whether videos with this attribute tend to perform above or below the median. 
 Based on the provided titles, identify which other attributes contribute to a good or bad performance.
 
-Videos above the median (${q2}):
+Videos above the median (${median}):
 ${aboveMedian.map(({ text }) => `- ${text}`).join('\n')}
 
 Videos below the median:
@@ -223,7 +225,7 @@ export const getSimilarityPrompt = (text:iItem, texts:iItem[]) => {
     const belowPerformance = closestTexts.filter(({ output }) => output <= text.output)
 
     const task = `explains the performance of a video related to similar videos.`
-    const { q2 } = getQuartile(texts.map(({ output }) => output))
+    const { median } = getQuartiles(texts.map(({ output }) => output))
 
     return `${instructionsPrompt(task)}
 
@@ -240,7 +242,7 @@ Your decision will determine if the channel should continue publishing similar v
 And if so, how to optimize those videos to improve performance.
 Else, what other types of videos should be considered.
 
-The video had ${text.output} views, while the channel's median is ${q2} views.
+The video had ${text.output} views, while the channel's median is ${median} views.
 `
 }
 
@@ -480,7 +482,7 @@ Remember, as a data analyst, your job is to find the truth not be nice.
 `}
 
 export const attributeTopChannels = async(attribute:string, items:iItem[], correlations:iCorrelation[]) => {
-    const sortedChannels = items.sort((a, b) =>  b.output - a.output)
+    const sortedChannels = [...items].sort((a, b) =>  b.output - a.output)
     const topQuartileChannels = sortedChannels.slice(0, Math.floor(sortedChannels.length / 4))
 
     const channels = topQuartileChannels.sort((a, b) => {

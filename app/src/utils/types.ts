@@ -75,6 +75,7 @@ export interface iItem {
     cluster:number
     center:number[]
     category?:string
+    analysis?:string
 }
 
 export interface iScatterData {

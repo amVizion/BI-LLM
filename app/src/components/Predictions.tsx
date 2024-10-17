@@ -62,7 +62,7 @@ export const Predictions = ({items, clusters, correlations, setAction}:iPredicti
 <table className='table is-fullwidth'>
     <thead>
         <tr className={'is-light'}>
-            <th style={TABLE_HEADER_STYLE} colSpan={clusters ? 7 : 6}> 
+            <th style={TABLE_HEADER_STYLE} colSpan={clusters ? 6 : 5}> 
                 Predictions Table 
             </th>
             <th>
@@ -79,7 +79,7 @@ export const Predictions = ({items, clusters, correlations, setAction}:iPredicti
                 </Dropdown>
             </th>
 
-            <th>
+            <th colSpan={2} style={{textAlign:'center'}}>
                 <button 
                     onClick={makePredictions}
                     className={`button is-link`} 

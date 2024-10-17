@@ -5,6 +5,7 @@ import { DEVELOPER_KEY } from '../ignore/config'
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 // import { analysis } from '../../lib/analysis'
+import { inference } from './inference'
 import { join } from 'path'
 
 const PART = [
@@ -51,17 +52,19 @@ const getChannel = async(channelId:string, authClient:any, forHandle:boolean=tru
         await sleep(1)
         const { data:playlist } = await client.playlistItems.list({
             part:['id', 'contentDetails', 'snippet', 'status'],
-            playlistId: playlistId.replace('UU', 'UUSH'), // Filters out shorts.
+            playlistId: playlistId.replace('UU', 'UULF'), // Filters out shorts. 
             maxResults:50,
             auth:authClient.apiKey,
             pageToken: nextPageToken
-        })
+        }) // Shorts:UUSH , Videos: UULF.
 
 //        console.log(playlist.items?.length)
         return playlist
     }
 
     let data:youtube_v3.Schema$PlaylistItemListResponse = await listVideos()
+    playlist.push(data.items!)
+
     while(true) {
         const nextPageToken = data?.nextPageToken
         if(!nextPageToken) break
@@ -86,9 +89,9 @@ const getChannel = async(channelId:string, authClient:any, forHandle:boolean=tru
         allVideos.push(...videos!)
     }
 
-    const videosPath = join(channelDir, 'shorts.json')
+    const videosPath = join(channelDir, 'videos.json')
     writeFileSync(videosPath, JSON.stringify(allVideos, null, 2))
-    return allVideos as youtube_v3.Schema$Video[]
+    return { channelName, videos: allVideos }
 }
 
 const getComments = async(videos: youtube_v3.Schema$Video[], authClient:any, channelId:string) => {
@@ -248,18 +251,19 @@ const index = async() => {
     const googleAuth = new auth.GoogleAuth({ apiKey:DEVELOPER_KEY })
     const authClient = await googleAuth.getClient()
 
-    const channelId = '20VC with Harry Stebbings'
+    const channelId = '20VC'
 
-//    const videos = await getChannel(channelId, authClient)
-    // await inference(videos)
+    const {videos, channelName} = await getChannel(channelId, authClient)
+    await inference(videos, `${DATA_DIR}/${channelName}`)
+    return
 
     // Get comments.
-//    await getComments(videos as youtube_v3.Schema$Video[], authClient, channelId)
-//    const comments = getAllComments(channelId, 0)
+//    await getComments(videos as youtube_v3.Schema$Video[], authClient, channelName)
+//    const comments = getAllComments(channelName, 0)
 
     // Get subscriptions.
-//    await getSubscriptions(comments, authClient, channelId)
-//    const subscriptions = getAllSubscriptions(channelId, 0)
+//    await getSubscriptions(comments, authClient, channelName)
+//    const subscriptions = getAllSubscriptions(channelName, 0)
 
     // Get videos from subscriptions.
 

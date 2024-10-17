@@ -118,7 +118,7 @@ export const Items = ({ items, verticals, verticalCorrelations, correlations }:i
             clusters={clusters}
             setAction={setAction}
             correlations={correlations}
-            items={items.sort((a, b) => b.output - a.output)}
+            items={[...items].sort((a, b) => b.output - a.output)}
         />
     </div>
 }
