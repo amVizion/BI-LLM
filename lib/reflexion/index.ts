@@ -25,20 +25,18 @@ const getTexts = () => {
 }
 
 const v1 = async() => {
-    const texts = getTexts()
+    const rawTexts = getTexts()
 
-    const { texts:items, correlations, verticalCorrelations } = await analysis(texts, DIR)
-    const report = await getReport({ items, correlations, verticalCorrelations, dir:DIR })
+    const { texts, correlations, verticalCorrelations } = await analysis(rawTexts, DIR)
+    const report = await getReport({ texts, correlations, verticalCorrelations, dir:DIR })
 
-    const quartiles =  getQuartiles(items.map(({ output }) => output))
-    const predictions = await makePredictions(items, report, quartiles, DIR)
-
-    const evaluation = evaluatePredictions(predictions, quartiles, `${DIR}/evaluations.json`)
+    const predictions = await makePredictions(texts, report, DIR)
+    const evaluation = evaluatePredictions(predictions, `${DIR}/evaluations.json`)
     console.log(evaluation)
 }
 
 interface iImproveReportInput { items:iItem[], report:string, dir:string }
-const improveReport = async({ items, report, dir }:iImproveReportInput) => {
+export const improveReport = async({ items, report, dir }:iImproveReportInput) => {
     let NUMBER_OF_PREDICTIONS = 20
     const predictions:iItem[] = []
     const quartiles =  getQuartiles(items.map(({ output }) => output))
@@ -85,4 +83,4 @@ const index = async() => {
     } catch (error) { v1() }
 }
 
-index().catch(console.error)
+// index().catch(console.error)

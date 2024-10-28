@@ -1,4 +1,4 @@
-import sortedSubscriptions from '../ignore/data/youtube/20VC/sortedSubscriptions.json'
+import sortedSubscriptions from '../ignore/data/youtube/Y Combinator/sortedSubscriptions.json'
 
 import { auth, youtube, youtube_v3 } from '@googleapis/youtube'
 import { DEVELOPER_KEY } from '../ignore/config'
@@ -35,6 +35,8 @@ const getChannel = async(channelId:string, authClient:any, forHandle:boolean=tru
 
     // Create channel dir
     const channelName = channel.snippet?.title
+    if(!channelName) throw new Error('No channel name found')
+
     console.log(channelName)
     const channelDir = join(DATA_DIR, channelName!)
     if(!existsSync(channelDir)) mkdirSync(channelDir)
@@ -152,7 +154,7 @@ const getComments = async(videos: youtube_v3.Schema$Video[], authClient:any, cha
 
 const getAllComments = (channelId:string, page:number) => {
     // Iterate through comments directory.
-    const pageSize = 250
+    const pageSize = 100
     const commentsDir = join(DATA_DIR, channelId, 'comments')
     const files = readdirSync(commentsDir)
 
@@ -251,11 +253,11 @@ const index = async() => {
     const googleAuth = new auth.GoogleAuth({ apiKey:DEVELOPER_KEY })
     const authClient = await googleAuth.getClient()
 
-    const channelId = '20VC'
+    const channelId = 'ycombinator'
+    const channelName = 'Y Combinator'
 
-    const {videos, channelName} = await getChannel(channelId, authClient)
-    await inference(videos, `${DATA_DIR}/${channelName}`)
-    return
+//    const {videos, channelName} = await getChannel(channelId, authClient)
+//    await inference(videos, `${DATA_DIR}/${channelName}`)
 
     // Get comments.
 //    await getComments(videos as youtube_v3.Schema$Video[], authClient, channelName)
@@ -263,15 +265,14 @@ const index = async() => {
 
     // Get subscriptions.
 //    await getSubscriptions(comments, authClient, channelName)
-//    const subscriptions = getAllSubscriptions(channelName, 0)
 
-    // Get videos from subscriptions.
+/*
+    const subscriptions:youtube_v3.Schema$Subscription[] = getAllSubscriptions(channelName, 0)
 
-/*    
-    const subsciptionsCounter = (subscriptions as youtube_v3.Schema$Subscription[]).reduce((acc, { snippet }, idx) => {
+    const subsciptionsCounter = subscriptions.reduce((acc, { snippet }, idx) => {
         // Log if mod 1000.
         if(idx % 1000 == 0) console.log(idx)
-        if(idx > 25000) return acc
+        if(idx > 45000) return acc
         const channelId = snippet?.resourceId?.channelId
         if(!channelId) return acc
         return { ...acc, [channelId!]: (acc[channelId!] || 0) + 1 }
@@ -284,11 +285,13 @@ const index = async() => {
     .filter(({ count }) => count > 1)
     console.log('sortedSubscriptions', sortedSubscriptions.length)
 
-    const subscriptionsPath = join(DATA_DIR, channelId, 'sortedSubscriptions.json')
+    const subscriptionsPath = join(DATA_DIR, channelName, 'sortedSubscriptions.json')
     writeFileSync(subscriptionsPath, JSON.stringify(sortedSubscriptions, null, 2))
+
+    // Get videos from subscriptions.
+    return
 */
-
-
+    
     for await(const { channelId } of sortedSubscriptions) {
         console.log(channelId)
 
@@ -296,16 +299,10 @@ const index = async() => {
             await sleep(5)
             if(!channelId) continue
 
-            await getChannel(channelId, authClient, false)
-        } catch(e) { 
-            console.log(e)
-            continue 
-        }
-        // await inference(videos)
+            const { videos, channelName } = await getChannel(channelId, authClient, false)
+            await inference(videos, `${DATA_DIR}/${channelName}`)
+        } catch(e) { continue }
     }
-
-
-
 }
 
 index().catch()

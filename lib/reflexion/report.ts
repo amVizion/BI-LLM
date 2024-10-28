@@ -5,7 +5,7 @@ import { iCorrelation, iItem } from '../../app/src/utils/types'
 import { callOllama } from '../utils/ollama'
 
 interface iGetReport { 
-    items:iItem[]
+    texts:iItem[]
     correlations:iCorrelation[]
     verticalCorrelations:{[vertical:string]:iCorrelation[]}
     dir:string
@@ -26,17 +26,17 @@ ${report}
 }
 
 export const getReport = async(input:iGetReport) => {
-    const { items, correlations, verticalCorrelations, dir } = input
+    const { texts, correlations, verticalCorrelations, dir } = input
     const verticals = Object.keys(verticalCorrelations)
 
     // Introduction prompt.
-    const intro = getIntroductionPrompt(correlations, items)
+    const intro = getIntroductionPrompt(correlations, texts)
 
     // Top attributes.
-    const topAttributes = getTopAttributesPrompt(correlations, items)
+    const topAttributes = getTopAttributesPrompt(correlations, texts)
 
     // Worst attributes.
-    const worstAttributes = getWorstAttributesPrompt(correlations, items)
+    const worstAttributes = getWorstAttributesPrompt(correlations, texts)
 
     // Iterate verticals.
     const verticalPrompts = verticals.map((vertical) => {

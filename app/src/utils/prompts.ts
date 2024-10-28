@@ -69,8 +69,6 @@ export const getIntroductionPrompt = (correlations:iCorrelation[], texts:iItem[]
     const attrs = correlations.sort((a, b) => b.mean - a.mean).slice(0, 10)
 
     const embeddings = texts.map(({ embeddings }) => embeddings)
-    console.log('embeddings', embeddings)
-
     const { centroids } = kMeansCluster(embeddings, 5)
     console.log('centroids', centroids)
 

@@ -1,3 +1,4 @@
+import { getQuartiles } from '../../app/src/utils/prompts'
 import { iItem } from '../../app/src/utils/types'
 import { callOllama } from '../utils/ollama'
 import { iInputText } from '../utils/types'
@@ -40,7 +41,9 @@ ${title}
 
 Prediction:`
 
-export const makePredictions = async(items:iItem[], report:string, quartiles:iQuartiles, fileName:string) => {
+export const makePredictions = async(items:iItem[], report:string, fileName:string) => {
+    const quartiles = getQuartiles(items.map(i => i.output))
+
     const sampleItems = [...items].sort(() => Math.random() - 0.5).slice(0, 100)
     const predictions:iInputText[] = []
     for (const item of sampleItems) {

@@ -72,7 +72,7 @@ export const Chart = ({ data, outputKey, clusters, setAction }: iClusterChart) =
       <CartesianGrid />
       <XAxis type='number' dataKey='x' />
       <YAxis type='number' dataKey='y' />
-      <ZAxis type='number' dataKey='z' range={[60, 200]} name='items'/> { /* TODO: Fix for clusters */ }
+      <ZAxis type='number' dataKey='z' range={[60, 80]} name='items'/> { /* TODO: Fix for clusters */ }
       <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip/>} />
 
       { items && <Scatter 
