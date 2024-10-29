@@ -171,7 +171,9 @@ interface iEvaluationMetrics {
     }
 }
 
-export const evaluatePredictions = (predictions:iItem[], quartiles:iQuartiles, fileName:string) => {
+export const evaluatePredictions = (predictions:iItem[], fileName:string) => {
+    const quartiles = getQuartiles(predictions.map(({ output }) => output))
+
     const accuracy = getAccuracyMetrics(predictions)
     const neutrality = getNeutralityMetrics(predictions, quartiles)
     const anomalyDetection = getAnomalyDetectionMetrics(predictions, quartiles)
@@ -183,17 +185,7 @@ export const evaluatePredictions = (predictions:iItem[], quartiles:iQuartiles, f
     return evaluation
 }
 
-
-export const compareReports = async(items:iItem[], report:string, reflexion:string, dir:string) => {
-    const quartiles =  getQuartiles(items.map(({ output }) => output))
-    const sampleItems = [...items].sort(() => Math.random() - 0.5).slice(0, 100)
-
-    const reportPredictions = await makePredictions(sampleItems, report, quartiles, `${dir}/reportPredictions`)
-    const newPredictions = await makePredictions(sampleItems, reflexion, quartiles, `${dir}/reflexionPredictions`)
-
-    const evaluateReport = evaluatePredictions(reportPredictions, quartiles, `${dir}/reportEvaluation.json`)
-    const evaluateReflexion = evaluatePredictions(newPredictions, quartiles, `${dir}/reflexionEvaluation.json`)
-
+export const compareEvaluations = (evalA:iEvaluationMetrics, evalB:iEvaluationMetrics):'A' | 'B' => {
     const compareAccuracy = (evaluateReport:iEvaluationMetrics, evaluateReflexion:iEvaluationMetrics) => {
         const reportAccuracy = evaluateReport.accuracy
         const reflexionAccuracy = evaluateReflexion.accuracy
@@ -211,10 +203,7 @@ export const compareReports = async(items:iItem[], report:string, reflexion:stri
 
         return reportScore
     }
-
-    const accuracyScore = compareAccuracy(evaluateReport, evaluateReflexion)
-    if(accuracyScore > 0) return report
-
+    
     const compareNeutrality = (evaluateReport:iEvaluationMetrics, evaluateReflexion:iEvaluationMetrics) => {
         const reportNeutrality = evaluateReport.neutrality
         const reflexionNeutrality = evaluateReflexion.neutrality
@@ -235,10 +224,6 @@ export const compareReports = async(items:iItem[], report:string, reflexion:stri
         const diff = reportDiff - reflexionDiff
         return diff
     }
-
-    const neutralityScore = compareNeutrality(evaluateReport, evaluateReflexion)
-    // If neutralityScore is positive. Reflexion is better.
-    if(neutralityScore > 0) return reflexion
 
     const compareAnomalyDetection = (evaluateReport:iEvaluationMetrics, evaluateReflexion:iEvaluationMetrics) => {
         const reportAnomalyDetection = evaluateReport.anomalyDetection
@@ -264,9 +249,30 @@ export const compareReports = async(items:iItem[], report:string, reflexion:stri
         return reportScore // If positive, report is better. If negative, reflexion is better.
     }
 
-    const anomalyDetectionScore = compareAnomalyDetection(evaluateReport, evaluateReflexion)
-    if(anomalyDetectionScore > 0) return report
+    const accuracyScore = compareAccuracy(evalA, evalB)
+    if(accuracyScore > 0) return 'A'
 
-    writeFileSync(`${dir}/winner.txt`, anomalyDetectionScore > 0 ? 'report' : 'reflexion')
-    return reflexion
+    const neutralityScore = compareNeutrality(evalA, evalB)
+    // If neutralityScore is positive. Reflexion is better.
+    if(neutralityScore > 0) return 'B'
+
+    const anomalyDetectionScore = compareAnomalyDetection(evalA, evalB)
+    if(anomalyDetectionScore > 0) return 'A'
+    return 'B'
+}
+
+
+export const compareReports = async(items:iItem[], report:string, reflexion:string, dir:string) => {
+    const sampleItems = [...items].sort(() => Math.random() - 0.5).slice(0, 100)
+
+    const reportPredictions = await makePredictions(sampleItems, report, `${dir}/reportPredictions`)
+    const newPredictions = await makePredictions(sampleItems, reflexion, `${dir}/reflexionPredictions`)
+
+    const evaluateReport = evaluatePredictions(reportPredictions, `${dir}/reportEvaluation.json`)
+    const evaluateReflexion = evaluatePredictions(newPredictions, `${dir}/reflexionEvaluation.json`)
+
+    const winner = compareEvaluations(evaluateReport, evaluateReflexion)
+    writeFileSync(`${dir}/winner.txt`, winner === 'A' ? 'report' : 'reflexion')
+
+    return winner === 'A' ? report : reflexion
 }
