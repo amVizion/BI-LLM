@@ -1,0 +1,31 @@
+{
+  "name": "bi-llm-db",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "ingest": "npx ts-node db/ingestion"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amVizion/BI-LLM.git"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "data"
+  ],
+  "author": "Santiago M.",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/amVizion/BI-LLM/issues"
+  },
+  "homepage": "https://github.com/amVizion/BI-LLM#readme",
+  "description": "",
+  "dependencies": {
+    "@googleapis/youtube": "^20.0.0",
+    "@types/node": "^22.7.1",
+    "gts": "^5.3.1",
+    "mongodb": "^6.10.0"
+  }
+}

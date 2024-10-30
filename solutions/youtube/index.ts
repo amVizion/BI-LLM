@@ -8,6 +8,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { inference } from './inference'
 import { join } from 'path'
 
+import { iSubscriptionDB } from '../../data/db/models'
+
 const PART = [
     'id',
     'status',
@@ -21,7 +23,27 @@ const PART = [
 const DATA_DIR = './ignore/data/youtube'
 const sleep = (secs:number) => new Promise(resolve => setTimeout(resolve, secs*1000))
 
-const getChannel = async(channelId:string, authClient:any, forHandle:boolean=true) => { // TODO: Add versioned data.
+
+interface iGetChannelVideosInput { 
+    channelId:string, 
+    forHandle?:boolean, 
+    getShorts?:boolean 
+    write?:boolean
+}
+
+
+let authClient:any
+const getYTClient = async() => {
+    console.log('Getting YT client')
+    const googleAuth = new auth.GoogleAuth({ apiKey:DEVELOPER_KEY })
+    const authClient = await googleAuth.getClient()
+    return authClient
+}
+
+
+export const getChannelVideos = async(props:iGetChannelVideosInput) => {
+    if(!authClient) authClient = await getYTClient()
+    const { channelId, forHandle=true, write, getShorts } = props
 
     const client = youtube('v3')
     const input = forHandle ? { forHandle: channelId } : { id: [channelId] }
@@ -39,10 +61,10 @@ const getChannel = async(channelId:string, authClient:any, forHandle:boolean=tru
 
     console.log(channelName)
     const channelDir = join(DATA_DIR, channelName!)
-    if(!existsSync(channelDir)) mkdirSync(channelDir)
+    if(write && !existsSync(channelDir)) mkdirSync(channelDir)
 
     const channelPath = join(channelDir, 'channel.json')
-    writeFileSync(channelPath, JSON.stringify(channel, null, 2))
+    if(write) writeFileSync(channelPath, JSON.stringify(channel, null, 2))
 
     const playlistId = channel.contentDetails?.relatedPlaylists?.uploads
 
@@ -50,17 +72,18 @@ const getChannel = async(channelId:string, authClient:any, forHandle:boolean=tru
 
     const playlist:youtube_v3.Schema$PlaylistItem[][] = []
 
+    const playlistPrefix = getShorts ? 'UUSH' : 'UULF'
     const listVideos = async(nextPageToken?:string) => {
         await sleep(1)
         const { data:playlist } = await client.playlistItems.list({
             part:['id', 'contentDetails', 'snippet', 'status'],
-            playlistId: playlistId.replace('UU', 'UULF'), // Filters out shorts. 
+            playlistId: playlistId.replace('UU', playlistPrefix), 
             maxResults:50,
             auth:authClient.apiKey,
             pageToken: nextPageToken
-        }) // Shorts:UUSH , Videos: UULF.
+        })
 
-//        console.log(playlist.items?.length)
+        console.log('getChannelVideos', channelName, playlist.items?.length, 'videos')
         return playlist
     }
 
@@ -70,6 +93,14 @@ const getChannel = async(channelId:string, authClient:any, forHandle:boolean=tru
     while(true) {
         const nextPageToken = data?.nextPageToken
         if(!nextPageToken) break
+
+        // If last video is older than one year, break.
+        const lastVideo = data.items?.slice(-1)[0]
+        const lastPublishedAt = lastVideo?.snippet?.publishedAt
+        if(!lastPublishedAt) break
+
+        const age = new Date().getTime() - new Date(lastPublishedAt).getTime()
+        if(age > 365*24*60*60*1000) break        
 
         data = await listVideos(nextPageToken)
         playlist.push(data.items!)
@@ -92,17 +123,13 @@ const getChannel = async(channelId:string, authClient:any, forHandle:boolean=tru
     }
 
     const videosPath = join(channelDir, 'videos.json')
-    writeFileSync(videosPath, JSON.stringify(allVideos, null, 2))
-    return { channelName, videos: allVideos }
+    if(write) writeFileSync(videosPath, JSON.stringify(allVideos, null, 2))
+    return { channel, videos: allVideos }
 }
 
-const getComments = async(videos: youtube_v3.Schema$Video[], authClient:any, channelId:string) => {
+export const getComments = async(videoId: string) => {
     const client = youtube('v3')
-    const videoIds = videos.map(({ id }) => id)
-
-    const channelDir = join(DATA_DIR, channelId)
-    const commentsDir = join(channelDir, 'comments')
-    if(!existsSync(commentsDir)) mkdirSync(commentsDir)
+    if(!authClient) authClient = await getYTClient()
 
     const listComments = async(videoId:string, nextPageToken?:string) => {
         await sleep(1)
@@ -115,40 +142,25 @@ const getComments = async(videos: youtube_v3.Schema$Video[], authClient:any, cha
             videoId
         })
 
-        const page = nextPageToken ? `_${nextPageToken}` : 0
-        const commentsPath = join(commentsDir, `${videoId}-${page}.json`)
-        writeFileSync(commentsPath, JSON.stringify(comments, null, 2))
-
         return data
     }
 
     const comments:youtube_v3.Schema$CommentThread[] = []
+    try { 
+        let data = await listComments(videoId)
 
-    for await(const videoId of videoIds) {
-        console.log(videoId)
+        while(true) {
+            comments.push(...data.items!)
 
-        const commentsPath = join(commentsDir, `${videoId}.json`)
-        if(!videoId || existsSync(commentsPath)) continue
+            const { nextPageToken } = data
+            if(!nextPageToken) break
+            if(comments.length >= 1000) break
 
+            data = await listComments(videoId, nextPageToken)
+        }
+    } catch(e) {}
 
-        try { 
-            let data = await listComments(videoId)
-
-            while(true) {
-                comments.push(...data.items!)
-
-                const { nextPageToken } = data
-                if(!nextPageToken) break
-
-                data = await listComments(videoId, nextPageToken)
-            }
-        } catch(e) { continue }
-    }
-
-    console.log(comments.length)
-
-    const commentsPath = join(channelDir, 'comments.json')
-    writeFileSync(commentsPath, JSON.stringify(comments, null, 2))
+    console.log(videoId, comments.length)
     return comments
 }
 
@@ -173,18 +185,9 @@ const getAllComments = (channelId:string, page:number) => {
     return allComments
 } 
 
-
-const getSubscriptions = async(comments:youtube_v3.Schema$CommentThread[], authClient:any, channelId:string) => {
+export const getSubscriptions = async(channelId:string) => {
     const client = youtube('v3')
-
-    const channelDir = join(DATA_DIR, channelId)
-    const subscriptionsDir = join(channelDir, 'subscriptions')
-    if(!existsSync(subscriptionsDir)) mkdirSync(subscriptionsDir)
-
-    const channelIds = comments.map(({ snippet }) => snippet?.topLevelComment?.snippet?.authorChannelId?.value)
-    .filter(Boolean) || []
-
-    const uniqueChannelIds = Array.from(new Set(channelIds))
+    const authClient = await getYTClient()
 
     const listChannels = async(channelId:string, nextPageToken?:string) => {
         await sleep(1)
@@ -196,35 +199,43 @@ const getSubscriptions = async(comments:youtube_v3.Schema$CommentThread[], authC
             pageToken: nextPageToken
         })
 
-        const page = nextPageToken ? `_${nextPageToken}` : 0
-        const subscriptionsPath = join(subscriptionsDir, `${channelId}-${page}.json`)
-        writeFileSync(subscriptionsPath, JSON.stringify(data, null, 2))
         return data
     }
 
     const subscriptions:youtube_v3.Schema$Subscription[] = []
 
-    for await(const channelId of uniqueChannelIds) {
-        if(!channelId) continue
-        try {
-            let data = await listChannels(channelId)
+    let data = await listChannels(channelId)
+    while(true) {
+        subscriptions.push(...data.items!)
 
-            while(true) {
-                subscriptions.push(...data.items!)
+        const nextPageToken = data.nextPageToken
+        if(!nextPageToken) break
 
-                const nextPageToken = data.nextPageToken
-                if(!nextPageToken) break
-
-                data = await listChannels(channelId, nextPageToken)
-            } 
-        } catch(e) { continue }
+        data = await listChannels(channelId, nextPageToken)
     }
 
-    console.log(subscriptions.length)
-
-    const subscriptionsPath = join(DATA_DIR, channelId, 'subscriptions.json')
-    writeFileSync(subscriptionsPath, JSON.stringify(subscriptions, null, 2))
     return subscriptions
+}
+
+
+export const countSubscriptions = (subscriptions:iSubscriptionDB[]) => {
+    const subsciptionsCounter = subscriptions.reduce((acc, { channelId }, idx) => {
+        // Log if mod 1000.
+        if(idx % 1000 == 0) console.log(idx)
+        if(idx > 45000) return acc
+        if(!channelId) return acc
+        return { ...acc, [channelId!]: (acc[channelId!] || 0) + 1 }
+    }, {} as Record<string, number>)
+    console.log('subsciptionsCounter', Object.keys(subsciptionsCounter).length)
+
+    const sortedSubscriptions = Object.entries(subsciptionsCounter)
+    .map(([channelId, count]) => ({channelId, count}))
+    .sort((a, b) => b.count - a.count)
+    .filter(({ count }) => count > 1)
+    console.log('sortedSubscriptions', sortedSubscriptions.length)
+
+    return sortedSubscriptions
+
 } 
 
 const getAllSubscriptions = (channelId:string, page:number) => {
@@ -290,7 +301,6 @@ const index = async() => {
 
     // Get videos from subscriptions.
     return
-*/
     
     for await(const { channelId } of sortedSubscriptions) {
         console.log(channelId)
@@ -299,10 +309,11 @@ const index = async() => {
             await sleep(5)
             if(!channelId) continue
 
-            const { videos, channelName } = await getChannel(channelId, authClient, false)
+            const { videos, channelName } = await getChannelVideos(channelId, authClient, false)
             await inference(videos, `${DATA_DIR}/${channelName}`)
         } catch(e) { continue }
     }
+*/
 }
 
-index().catch()
+// index().catch()

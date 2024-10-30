@@ -72,7 +72,7 @@ const LABELS_PATH = 'A.4. Labels.json'
 const VERTICAL_LABELS_PATH = 'A.5. VerticalLabels.json'
 
 // Embed
-export const embed = async(texts:iInputText[], {path='', skipWrite=true}:iErcConfig) => {
+export const embed = async(texts:iInputText[], {path='', skipWrite=true}:iErcConfig={}) => {
     const model = await use.load()
 
     const tensors = await model.embed(texts.map(({ text }) => text))
@@ -91,7 +91,7 @@ export const embed = async(texts:iInputText[], {path='', skipWrite=true}:iErcCon
 }
 
 // Reduce
-export const reduce = async(texts:iEmbeddedText[], config:iErcConfig):Promise<iEmbeddedText[]> => {
+export const reduce = async(texts:iEmbeddedText[], config:iErcConfig={}):Promise<iEmbeddedText[]> => {
     const { path, nComponents=5, pcaModelPath, skipWrite=true } = config
 
     const embeddings = texts.map(({ embeddings }) => embeddings)
@@ -221,6 +221,13 @@ interface iErlOutput {
     labels:string[] 
     embeddedTexts:iEmbeddedText[]
     verticalLabels?:tVerticalLabels
+}
+
+export const getEmbeddings = async(texts:string[]) => {
+    const inputTexts = texts.map(text => ({ text, output:0 }))
+    const embeddedTexts = await embed(inputTexts)
+    const reducedEmbeddings = await reduce(embeddedTexts)
+    return reducedEmbeddings
 }
 
 export const erlPipeline = async(texts:iInputText[], config:iErcConfig):Promise<iErlOutput> => {
