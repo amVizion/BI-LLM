@@ -1,13 +1,3 @@
-/*
-
-- [ ] Import embeddings.
-- [ ] Import labels.
-- [ ] Import scores.
-- [ ] Train predictors.
-- [ ] Store predictors.
-
-*/
-
 import { iEmbeddedText, iScoredText } from '../lib/utils/types'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { predictLabels } from '../lib/pipelines/2.SPC'

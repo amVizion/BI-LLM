@@ -1,13 +1,8 @@
 /*
 
 # Labeling:
-1. [ ] Embed texts.
-    - [ ] Store PCA model.
-    - [ ] Reuse PCA model.
-    - [ ] Store texts (with embeddings).
+1. Embed texts (reuse PCA).
 2. [ ] Label texts.
-    - [ ] Store selected labels.
-    - [ ] Store labeled texts.
 
 TODO:
 - Fix Docs (no embeddings on this module).
@@ -27,7 +22,7 @@ const label = async(input:{texts:string[], labelPrompt:string, path:string}) => 
 
     const LABEL_PROMPT = `
 Output a JSON array. No comments, or explanations required.
-Example: ["adjective1", "adjective2", "adjective3"]
+Example: ["word1", "word2", "word2"]
 
 ${labelPrompt}`        
 
@@ -48,8 +43,8 @@ ${labelPrompt}`
 
             // Validate that each label is one-word or two-words max.
             for(const label of labels) {
-                const LABEL_ERROR = 'Labels must be one-word or two-words max.'
-                if(label.split(' ').length > 2) throw new Error(LABEL_ERROR)
+                const LABEL_ERROR = 'Labels must be three-words max.'
+                if(label.split(' ').length > 3) throw new Error(LABEL_ERROR)
             }
 
             allLabels.push(...labels)
